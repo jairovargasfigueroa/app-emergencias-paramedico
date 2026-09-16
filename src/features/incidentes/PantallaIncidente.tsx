@@ -1,4 +1,5 @@
 import Feather from '@expo/vector-icons/Feather'
+import { useQuery } from '@tanstack/react-query'
 import { router, useLocalSearchParams } from 'expo-router'
 import type { ReactNode } from 'react'
 import { ScrollView, useColorScheme } from 'react-native'
@@ -8,16 +9,19 @@ import { Button, H1, Paragraph, Text, XStack, YStack, useTheme } from 'tamagui'
 
 import { usePosicionActual } from '@/features/posicion/posicionActual'
 import { distanciaEnMetros, formatearDistancia } from '@/shared/formato/distancia'
-import { duracionDesde } from '@/shared/formato/tiempo'
+import { duracionLarga } from '@/shared/formato/tiempo'
 import { DELTA_CALLE, regionAlrededorDe } from '@/shared/mapa/region'
 import { useAhora } from '@/shared/reloj/useAhora'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 import { PantallaDeEstado } from '@/shared/ui/PantallaDeEstado'
 
+import { estaAbandonado } from './abandono'
 import type { IncidenteAbierto } from './api'
-import { textoAfectados } from './cercania'
+import { textoPersonasAfectadas, textoUnidadesEnCamino } from './cercania'
+import { tituloDelLugar } from './direcciones'
 import { useIncidentesAbiertos } from './incidentesAbiertos'
 import { MarcadorIncidente } from './MarcadorIncidente'
+import { direccionIncidenteQuery } from './queries'
 
 export function volverAlMapa() {
   if (router.canGoBack()) {
@@ -32,7 +36,7 @@ type Props = {
   acciones?: (incidente: IncidenteAbierto) => ReactNode
 }
 
-/** PB-03 CA-05: todo lo que se sabe del incidente antes de decidir si acudir. */
+/** PB-03 CA-05: todo lo que se sabe de la emergencia antes de decidir si acudir. */
 export function PantallaIncidente({ acciones }: Props) {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { cargando, incidentes } = useIncidentesAbiertos()
@@ -45,7 +49,7 @@ export function PantallaIncidente({ acciones }: Props) {
   if (!incidente) {
     // PB-03 R6: al pasar a un estado final, el incidente deja de publicarse.
     return (
-      <PantallaDeEstado titulo="Este incidente ya se cerró" descripcion="Ya no está abierto, así que no aparece en el mapa.">
+      <PantallaDeEstado titulo="Esta emergencia ya se cerró" descripcion="Ya no está abierta, así que no aparece en el mapa.">
         <BotonPrincipal onPress={volverAlMapa}>
           <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
             Volver al mapa
@@ -64,19 +68,15 @@ function DetalleIncidente({ incidente, acciones }: { incidente: IncidenteAbierto
   const tema = useTheme()
   const posicion = usePosicionActual()
   const ahora = useAhora()
+  const direccion = useQuery(direccionIncidenteQuery(incidente)).data
 
   const distancia = posicion ? formatearDistancia(distanciaEnMetros(posicion, incidente)) : null
-  const tiempo = duracionDesde(incidente.fechaHoraCreacion, ahora)
-  const acuden =
-    incidente.unidadesAcudiendo === 0
-      ? 'Ninguna'
-      : incidente.unidadesAcudiendo === 1
-        ? '1 unidad'
-        : `${incidente.unidadesAcudiendo} unidades`
+  const tiempo = `hace ${duracionLarga(incidente.fechaHoraCreacion, ahora)}`
+  const acuden = textoUnidadesEnCamino(incidente.unidadesAcudiendo)
 
   return (
     <YStack flex={1} bg="$fondo">
-      <YStack height="42%">
+      <YStack height="38%">
         <MapView
           style={{ flex: 1 }}
           initialRegion={regionAlrededorDe(incidente, DELTA_CALLE)}
@@ -87,7 +87,7 @@ function DetalleIncidente({ incidente, acciones }: { incidente: IncidenteAbierto
           pitchEnabled={false}
           userInterfaceStyle={esquema}
         >
-          <MarcadorIncidente incidente={incidente} destacado />
+          <MarcadorIncidente incidente={incidente} destacado abandonado={estaAbandonado(incidente, ahora)} />
         </MapView>
         <Button
           position="absolute"
@@ -109,20 +109,25 @@ function DetalleIncidente({ incidente, acciones }: { incidente: IncidenteAbierto
 
       <YStack flex={1} mt={-22} borderTopLeftRadius={22} borderTopRightRadius={22} bg="$superficie" overflow="hidden">
         <ScrollView contentContainerStyle={{ padding: 20, gap: 18 }}>
-          <YStack gap={4}>
-            <Text color="$textoSecundario" fontSize={13}>
-              {`Incidente${distancia ? ` a ${distancia.valor} ${distancia.unidad}` : ''} · creado hace ${tiempo}`}
-            </Text>
-            <H1 color="$texto" fontSize={26} lineHeight={32} fontWeight="600">
-              {textoAfectados(incidente.cantidadAfectados)}
+          <YStack gap={5}>
+            {/* El título es el lugar: es lo primero que necesita para decidir. */}
+            <H1 color="$texto" fontSize={24} lineHeight={30} fontWeight="600">
+              {tituloDelLugar(direccion, distancia)}
             </H1>
+            <Text color="$textoSecundario" fontSize={15} lineHeight={21}>
+              {distancia ? `A ${distancia.valor} ${distancia.unidad} en línea recta · ${tiempo}` : tiempo}
+            </Text>
           </YStack>
 
-          <XStack gap={10}>
-            <Dato etiqueta="Distancia" valor={distancia ? `${distancia.valor} ${distancia.unidad}` : '—'} />
-            <Dato etiqueta="Tiempo" valor={tiempo} />
-            <Dato etiqueta="Acuden" valor={acuden} />
-          </XStack>
+          {/* Lo decisivo arriba del todo: si ya va alguien y cuántos afectados hay (PB-03 R2). */}
+          <YStack gap={4} px={14} py={12} rounded={12} bg="$fondo">
+            <Text color="$texto" fontSize={17} lineHeight={22} fontWeight="600">
+              {acuden.charAt(0).toUpperCase() + acuden.slice(1)}
+            </Text>
+            <Text color="$textoSecundario" fontSize={15} lineHeight={21}>
+              {textoPersonasAfectadas(incidente.cantidadAfectados)}
+            </Text>
+          </YStack>
 
           <YStack gap={10}>
             <Text color="$texto" fontSize={14} fontWeight="600">
@@ -130,7 +135,7 @@ function DetalleIncidente({ incidente, acciones }: { incidente: IncidenteAbierto
             </Text>
             {incidente.descripciones.length === 0 ? (
               <Paragraph color="$textoSecundario" fontSize={15} lineHeight={22}>
-                Nadie describió lo que pasó.
+                Todavía no dijeron qué pasó.
               </Paragraph>
             ) : (
               incidente.descripciones.map((descripcion, indice) => (
@@ -150,29 +155,21 @@ function DetalleIncidente({ incidente, acciones }: { incidente: IncidenteAbierto
               ))
             )}
           </YStack>
+
+          {/* Aire antes del pie: el botón no queda donde el dedo acaba de tocar la tarjeta para entrar. */}
+          <YStack height={24} />
         </ScrollView>
 
         {acciones ? (
-          <YStack px={20} pt={12} pb={margenes.bottom + 16} gap={10} borderTopWidth={1} borderColor="$borde">
-            {acciones}
-          </YStack>
+          <XStack px={20} pt={20} pb={margenes.bottom + 16} borderTopWidth={1} borderColor="$borde">
+            <YStack flex={1} gap={10}>
+              {acciones}
+            </YStack>
+          </XStack>
         ) : (
           <YStack height={margenes.bottom} />
         )}
       </YStack>
-    </YStack>
-  )
-}
-
-function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
-  return (
-    <YStack flex={1} minW={0} gap={2} p={12} rounded={12} bg="$fondo">
-      <Text color="$textoSecundario" fontSize={12}>
-        {etiqueta}
-      </Text>
-      <Text color="$texto" fontSize={17} fontWeight="600" numberOfLines={1}>
-        {valor}
-      </Text>
     </YStack>
   )
 }

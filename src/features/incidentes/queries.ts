@@ -1,9 +1,28 @@
-import { mutationOptions, type QueryClient } from '@tanstack/react-query'
+import { mutationOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
 
 import { aplicarAtencion } from '@/features/atencion/queries'
 import { servicioKeys } from '@/features/servicio/queries'
 
+import type { IncidenteAbierto } from './api'
 import { incidentesApi } from './api'
+import { direccionAproximada } from './direcciones'
+
+export const incidentesKeys = {
+  direccion: (incidenteId: number) => ['direccion-incidente', incidenteId] as const,
+}
+
+/**
+ * Dirección aproximada del incidente, resuelta en el teléfono. Se cachea para siempre por incidente: sus coordenadas
+ * no cambian y la consulta no tiene por qué repetirse.
+ */
+export const direccionIncidenteQuery = (incidente: Pick<IncidenteAbierto, 'id' | 'latitud' | 'longitud'>) =>
+  queryOptions({
+    queryKey: incidentesKeys.direccion(incidente.id),
+    queryFn: () => direccionAproximada(incidente.latitud, incidente.longitud),
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: 1,
+  })
 
 export type AcudirAIncidente = {
   paramedicoId: number

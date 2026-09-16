@@ -25,15 +25,27 @@ export function ordenarPorCercania(incidentes: IncidenteAbierto[], posicion: Coo
   })
 }
 
-/** "5 afectados", "1 afectado" o "Afectados sin reportar". */
-export function textoAfectados(cantidad: number | undefined): string {
+/** "3 personas afectadas", "1 persona afectada" o "Afectados sin reportar". */
+export function textoPersonasAfectadas(cantidad: number | undefined): string {
   if (cantidad === undefined || cantidad === null) {
     return 'Afectados sin reportar'
   }
-  return cantidad === 1 ? '1 afectado' : `${cantidad} afectados`
+  return cantidad === 1 ? '1 persona afectada' : `${cantidad} personas afectadas`
 }
 
-/** "1 unidad acudiendo", "2 unidades acudiendo". */
-export function textoUnidadesAcudiendo(cantidad: number): string {
-  return cantidad === 1 ? '1 unidad acudiendo' : `${cantidad} unidades acudiendo`
+/** Lo decisivo antes de acudir: "nadie va todavía", "1 unidad en camino", "2 unidades en camino" (PB-03 R2). */
+export function textoUnidadesEnCamino(cantidad: number): string {
+  if (cantidad === 0) {
+    return 'nadie va todavía'
+  }
+  return cantidad === 1 ? '1 unidad en camino' : `${cantidad} unidades en camino`
+}
+
+/** Cuántas unidades acuden además de la mía: "nadie más va", "1 unidad más va", "2 unidades más van". */
+export function textoOtrasUnidades(unidadesAcudiendo: number): string {
+  const otras = Math.max(0, unidadesAcudiendo - 1)
+  if (otras === 0) {
+    return 'nadie más va'
+  }
+  return otras === 1 ? '1 unidad más va' : `${otras} unidades más van`
 }
