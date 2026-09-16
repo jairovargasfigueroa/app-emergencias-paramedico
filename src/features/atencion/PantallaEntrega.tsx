@@ -19,10 +19,11 @@ import {
   useToastController,
 } from 'tamagui'
 
-import { leerPosicionActual } from '@/features/posicion/posicionActual'
+import { leerPosicionActual, usePosicionActual } from '@/features/posicion/posicionActual'
 import { paramedicoGuardadoQuery } from '@/features/servicio/queries'
 import { mensajeDeError } from '@/shared/api/cliente'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
+import { MantenerPresionado } from '@/shared/ui/MantenerPresionado'
 import { PantallaDeEstado } from '@/shared/ui/PantallaDeEstado'
 
 import { atencionActivaQuery, centrosSaludQuery, entregarMutation } from './queries'
@@ -51,6 +52,7 @@ export function PantallaEntrega() {
   const atencion = useQuery({ ...atencionActivaQuery(paramedico?.id ?? 0), enabled: paramedico != null })
   const centros = useQuery(centrosSaludQuery())
   const entregar = useMutation(entregarMutation(queryClient))
+  const sinPosicion = usePosicionActual() === null
 
   const [destino, setDestino] = useState<string>('')
   const [descripcion, setDescripcion] = useState('')
@@ -77,12 +79,11 @@ export function PantallaEntrega() {
   function marcarEntrega() {
     const ubicacion = leerPosicionActual()
     if (!ubicacion) {
-      toast.show('Esperando tu ubicación', { message: 'Activa el GPS y vuelve a intentarlo en unos segundos.' })
       return
     }
     const texto = descripcion.trim()
-    entregar.mutate(
-      {
+    return entregar
+      .mutateAsync({
         paramedicoId,
         atencionId,
         datos: {
@@ -90,15 +91,23 @@ export function PantallaEntrega() {
           centroSaludId: destino && destino !== OTRO_DESTINO ? Number(destino) : undefined,
           destinoDescripcion: texto.length > 0 ? texto : undefined,
         },
-      },
-      {
-        onSuccess: () => {
-          toast.show('Paciente entregado', { message: 'Tu ambulancia vuelve a estar disponible.' })
-          router.dismissTo('/')
-        },
-        onError: (error) => toast.show('No se pudo marcar la entrega', { message: mensajeDeError(error) }),
-      },
-    )
+      })
+      .then((entregada) => {
+        // Los tres tiempos del servicio vienen en la respuesta: el cierre los muestra sin volver a consultar.
+        router.replace({
+          pathname: '/atencion/cierre',
+          params: {
+            llegada: entregada.horaLlegada ?? '',
+            recogida: entregada.horaRecogida ?? '',
+            entrega: entregada.horaEntrega ?? '',
+          },
+        })
+      })
+      .catch((error: unknown) => {
+        toast.show('No se pudo marcar la entrega', { message: mensajeDeError(error) })
+        // Se vuelve a lanzar para que el control se desbloquee y pueda reintentarse.
+        throw error
+      })
   }
 
   return (
@@ -196,17 +205,14 @@ export function PantallaEntrega() {
           </YStack>
         </ScrollView>
 
+        {/* Último hito irreversible del servicio: se confirma sosteniendo, igual que la llegada y la recogida. */}
         <YStack px={20} pt={12}>
-          <BotonPrincipal
-            disabled={entregar.isPending}
-            opacity={entregar.isPending ? 0.7 : 1}
-            icon={entregar.isPending ? <Spinner color="$primarioTexto" /> : undefined}
-            onPress={marcarEntrega}
-          >
-            <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
-              {entregar.isPaused ? 'Esperando conexión…' : 'Marcar entrega'}
-            </Button.Text>
-          </BotonPrincipal>
+          <MantenerPresionado
+            texto="Mantén presionado: entregado"
+            apagado={sinPosicion}
+            textoApagado="Esperando tu ubicación para poder marcar la entrega"
+            onCompletar={marcarEntrega}
+          />
         </YStack>
       </YStack>
     </KeyboardAvoidingView>

@@ -1,5 +1,5 @@
 import Feather from '@expo/vector-icons/Feather'
-import { Button, Text, XStack, YStack } from 'tamagui'
+import { Text, XStack, YStack } from 'tamagui'
 
 import { horaCorta } from '@/shared/formato/tiempo'
 
@@ -20,13 +20,11 @@ const HITOS: Hito[] = [
   { estado: 'PACIENTE_ENTREGADO', titulo: 'Paciente entregado', hora: (a) => a.horaEntrega, textoHora: 'Entregado a las' },
 ]
 
-type Props = {
-  atencion: Atencion
-  onEditarPaciente: () => void
-}
-
-/** Línea de tiempo de la atención: hitos cumplidos con su hora, el siguiente paso y los que faltan. */
-export function HitosAtencion({ atencion, onEditarPaciente }: Props) {
+/**
+ * Línea de tiempo de la atención: hitos cumplidos con su hora, el siguiente paso y los que faltan. Va plegada detrás
+ * de "Ver detalles": mientras se conduce, el centro de la pantalla es para el hito que toca marcar.
+ */
+export function HitosAtencion({ atencion }: { atencion: Atencion }) {
   const actual = HITOS.findIndex((hito) => hito.estado === atencion.estado)
 
   return (
@@ -36,7 +34,6 @@ export function HitosAtencion({ atencion, onEditarPaciente }: Props) {
         const siguiente = indice === actual + 1
         const ultimo = indice === HITOS.length - 1
         const hora = hito.hora(atencion)
-        const conPaciente = hito.estado === 'PACIENTE_RECOGIDO' && cumplido
 
         return (
           <XStack key={hito.estado} gap={14}>
@@ -55,34 +52,25 @@ export function HitosAtencion({ atencion, onEditarPaciente }: Props) {
                   bg="$superficie"
                 />
               )}
-              {ultimo ? null : <YStack width={2} flex={1} minH={26} bg={indice < actual ? '$disponible' : '$borde'} />}
+              {ultimo ? null : <YStack width={2} flex={1} minH={22} bg={indice < actual ? '$disponible' : '$borde'} />}
             </YStack>
 
             <YStack flex={1} pt={3} pb={ultimo ? 0 : 12} gap={2}>
-              <Text color={cumplido || siguiente ? '$texto' : '$textoSecundario'} fontSize={15} fontWeight={cumplido || siguiente ? '600' : '400'}>
+              <Text
+                color={cumplido || siguiente ? '$texto' : '$textoSecundario'}
+                fontSize={15}
+                fontWeight={cumplido || siguiente ? '600' : '400'}
+              >
                 {hito.titulo}
               </Text>
               {cumplido && hora ? (
-                <Text color="$textoSecundario" fontSize={13}>
+                <Text color="$textoSecundario" fontSize={14}>
                   {`${hito.textoHora} ${horaCorta(hora)}`}
                 </Text>
               ) : siguiente ? (
-                <Text color="$primarioPresionado" fontSize={13}>
+                <Text color="$primarioPresionado" fontSize={14}>
                   Siguiente paso
                 </Text>
-              ) : null}
-              {conPaciente ? (
-                <XStack items="center" justify="space-between" gap={8}>
-                  <Text color="$texto" fontSize={13} numberOfLines={1} flex={1}>
-                    {[atencion.nombrePaciente, atencion.documentoPaciente].filter(Boolean).join(' · ') ||
-                      'Paciente sin datos'}
-                  </Text>
-                  <Button size="$2" chromeless onPress={onEditarPaciente}>
-                    <Button.Text color="$primarioPresionado" fontSize={13} fontWeight="500">
-                      Editar
-                    </Button.Text>
-                  </Button>
-                </XStack>
               ) : null}
             </YStack>
           </XStack>
