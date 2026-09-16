@@ -114,20 +114,23 @@ export function PantallaEntrega() {
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
       <YStack flex={1} bg="$fondo" pt={margenes.top + 8} pb={margenes.bottom + 20}>
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, gap: 22 }} keyboardShouldPersistTaps="handled">
-          <Button self="flex-start" chromeless px={0} onPress={volver} icon={<Feather name="chevron-left" size={20} color={tema.texto?.val} />}>
-            <Button.Text color="$texto" fontSize={15} fontWeight="500">
-              Atención en curso
-            </Button.Text>
-          </Button>
-
-          <YStack gap={6}>
-            <H1 color="$texto" fontSize={26} lineHeight={32} fontWeight="600">
-              Entregar al paciente
+          <XStack items="center" gap={12}>
+            <Button
+              width={44}
+              height={44}
+              p={0}
+              rounded={999}
+              bg="$superficie"
+              borderColor="$borde"
+              aria-label="Volver a la atención"
+              onPress={volver}
+            >
+              <Feather name="chevron-left" size={24} color={tema.texto?.val} />
+            </Button>
+            <H1 color="$texto" fontSize={24} lineHeight={30} fontWeight="600">
+              ¿Dónde lo entregas?
             </H1>
-            <Paragraph color="$textoSecundario" fontSize={15} lineHeight={22}>
-              Tu ubicación actual queda como punto de entrega.
-            </Paragraph>
-          </YStack>
+          </XStack>
 
           <YStack gap={10}>
             <Text color="$texto" fontSize={14} fontWeight="600">
@@ -206,7 +209,10 @@ export function PantallaEntrega() {
         </ScrollView>
 
         {/* Último hito irreversible del servicio: se confirma sosteniendo, igual que la llegada y la recogida. */}
-        <YStack px={20} pt={12}>
+        <YStack px={20} pt={12} gap={10}>
+          <Paragraph color="$textoSecundario" fontSize={14} lineHeight={20}>
+            Se registra tu ubicación actual como punto de entrega.
+          </Paragraph>
           <MantenerPresionado
             texto="Mantén presionado: entregado"
             apagado={sinPosicion}

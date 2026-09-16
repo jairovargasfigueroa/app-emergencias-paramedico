@@ -12,7 +12,6 @@ import { useIncidentesAbiertos } from '@/features/incidentes/incidentesAbiertos'
 import { MarcadorIncidente } from '@/features/incidentes/MarcadorIncidente'
 import { direccionIncidenteQuery } from '@/features/incidentes/queries'
 import { leerPosicionActual, usePosicionActual } from '@/features/posicion/posicionActual'
-import type { Ambulancia } from '@/features/servicio/api'
 import { ErrorApi, mensajeDeError } from '@/shared/api/cliente'
 import { distanciaEnMetros, formatearDistancia } from '@/shared/formato/distancia'
 import { CENTRO_POR_DEFECTO, DELTA_BARRIO, DELTA_CIUDAD, regionAlrededorDe } from '@/shared/mapa/region'
@@ -30,7 +29,6 @@ import { atencionKeys, cancelarAtencionMutation, marcarLlegadaMutation, marcarRe
 type Props = {
   paramedicoId: number
   atencion: Atencion
-  ambulancia: Ambulancia
 }
 
 const MENSAJES_CANCELACION: Record<MotivoCancelacion, string> = {
@@ -44,7 +42,7 @@ const MENSAJES_CANCELACION: Record<MotivoCancelacion, string> = {
  * PB-05: la atención en curso. Cada hito congela la hora y la ubicación del momento (R2) y no se deshace, así que se
  * confirma manteniendo presionado. Lo reversible se sigue tocando.
  */
-export function AtencionEnCurso({ paramedicoId, atencion, ambulancia }: Props) {
+export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   const margenes = useSafeAreaInsets()
   const esquema = useColorScheme() === 'dark' ? 'dark' : 'light'
   const tema = useTheme()

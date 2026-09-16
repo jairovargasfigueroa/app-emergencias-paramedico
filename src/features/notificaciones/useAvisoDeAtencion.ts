@@ -31,7 +31,8 @@ export function useAvisoDeAtencion(paramedicoId: number, enServicio: boolean) {
 
   const incidente = atencion ? incidentes.find((abierto) => abierto.id === atencion.incidenteId) : undefined
   const direccion = useQuery({
-    ...direccionIncidenteQuery(incidente ?? { id: 0, latitud: 0, longitud: 0 }),
+    // Con el incidente todavía sin llegar, comparte clave con la pantalla: si ya la resolvió, sale de la caché.
+    ...direccionIncidenteQuery(incidente ?? { id: atencion?.incidenteId ?? 0, latitud: 0, longitud: 0 }),
     enabled: incidente !== undefined,
   }).data
 

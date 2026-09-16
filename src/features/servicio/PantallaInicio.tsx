@@ -88,7 +88,7 @@ export function PantallaInicio() {
   return (
     <>
       {atencion.data ? (
-        <AtencionEnCurso paramedicoId={datosParamedico.id} atencion={atencion.data} ambulancia={ambulancia} />
+        <AtencionEnCurso paramedicoId={datosParamedico.id} atencion={atencion.data} />
       ) : (
         <MapaDeIncidentes ambulancia={ambulancia} nombreParamedico={datosParamedico.nombreCompleto} />
       )}
