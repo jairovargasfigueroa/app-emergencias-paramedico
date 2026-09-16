@@ -7,8 +7,7 @@ import { H2, Paragraph, Spinner, Text, XStack, YStack } from 'tamagui'
 
 import { leerPosicionActual, usePosicionActual } from '@/features/posicion/posicionActual'
 import type { Ambulancia } from '@/features/servicio/api'
-import { AvisoFueraDeServicio } from '@/features/servicio/AvisoFueraDeServicio'
-import { EstadoAmbulancia } from '@/features/servicio/EstadoAmbulancia'
+import { TarjetaDeTurno } from '@/features/servicio/TarjetaDeTurno'
 import { CENTRO_POR_DEFECTO, DELTA_BARRIO, DELTA_CIUDAD, regionAlrededorDe } from '@/shared/mapa/region'
 import { useAhora } from '@/shared/reloj/useAhora'
 
@@ -87,32 +86,8 @@ export function MapaDeIncidentes({ ambulancia, nombreParamedico }: Props) {
         ))}
       </MapView>
 
-      <YStack position="absolute" t={margenes.top + 12} l={16} r={16} gap={10}>
-        <XStack
-          items="center"
-          justify="space-between"
-          gap={12}
-          px={14}
-          py={12}
-          rounded={16}
-          bg="$superficie"
-          shadowColor="#000000"
-          shadowOpacity={0.12}
-          shadowRadius={24}
-          shadowOffset={{ width: 0, height: 8 }}
-          elevation={6}
-        >
-          <YStack gap={2} flex={1} minW={0}>
-            <Text color="$texto" fontFamily="$mono" fontSize={16} fontWeight="500">
-              {ambulancia.placa}
-            </Text>
-            <Text color="$textoSecundario" fontSize={13} numberOfLines={1}>
-              {`${nombreParamedico} · en servicio`}
-            </Text>
-          </YStack>
-          <EstadoAmbulancia estado={ambulancia.estado} />
-        </XStack>
-        {ambulancia.estado === 'FUERA_DE_SERVICIO' ? <AvisoFueraDeServicio ambulanciaId={ambulancia.id} /> : null}
+      <YStack position="absolute" t={margenes.top + 12} l={16} r={16}>
+        <TarjetaDeTurno ambulancia={ambulancia} nombreParamedico={nombreParamedico} />
       </YStack>
 
       <YStack

@@ -51,6 +51,26 @@ export function activarUbicacion() {
   avisar()
 }
 
+export type AvisoDeUbicacion = {
+  texto: string
+  /** Si hay algo que el paramédico pueda hacer ahora mismo para arreglarlo. */
+  conAccion: boolean
+}
+
+/** Qué decirle cuando la ubicación no está llegando. Con `null` todo está bien y no hay nada que avisar. */
+export function avisoDeUbicacion(estado: EstadoUbicacion): AvisoDeUbicacion | null {
+  switch (estado) {
+    case 'activa':
+      return null
+    case 'pidiendo':
+      return { texto: 'Pidiendo permiso para usar tu ubicación.', conAccion: false }
+    case 'esperando':
+      return { texto: 'Esperando la señal del GPS. Hasta que llegue, las emergencias no se ordenan por cercanía.', conAccion: false }
+    default:
+      return { texto: 'Sin tu ubicación las emergencias no se ordenan por cercanía.', conAccion: true }
+  }
+}
+
 function avisar() {
   oyentes.forEach((oyente) => oyente())
 }

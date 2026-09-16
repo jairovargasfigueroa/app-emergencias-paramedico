@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button, H1, Input, Label, Paragraph, Spinner, Text, XStack, YStack } from 'tamagui'
 import { z } from 'zod'
 
-import { mensajeDeError } from '@/shared/api/cliente'
+import { ErrorApi, mensajeDeError } from '@/shared/api/cliente'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 import { MarcaSga } from '@/shared/ui/MarcaSga'
 import { MensajeDeCampo, textoDeErrores } from '@/shared/ui/MensajeDeCampo'
@@ -16,6 +16,14 @@ import { identificarMutation } from './queries'
 const esquema = z.object({
   telefono: z.string().trim().min(1, 'Escribe tu teléfono.'),
 })
+
+/** 404: no hay un paramédico activo con ese teléfono. El mensaje dice qué hacer, no solo que no se encontró. */
+function mensajeDeIdentificacion(error: unknown) {
+  if (error instanceof ErrorApi && error.status === 404) {
+    return 'No encontramos ese teléfono. Pídele al administrador que verifique con qué número te registró.'
+  }
+  return mensajeDeError(error)
+}
 
 /** Identificación provisional por teléfono, mientras no exista autenticación. */
 export function PantallaIdentificacion() {
@@ -32,8 +40,7 @@ export function PantallaIdentificacion() {
       try {
         await identificar.mutateAsync(esquema.parse(value).telefono)
       } catch (error) {
-        // 404: no hay un paramédico activo con ese teléfono. El mensaje del backend va bajo el campo.
-        setErrorServidor(mensajeDeError(error))
+        setErrorServidor(mensajeDeIdentificacion(error))
       }
     },
   })
@@ -94,20 +101,26 @@ export function PantallaIdentificacion() {
 
           <YStack flex={1} minH={32} />
 
-          <form.Subscribe selector={(estado) => [estado.isSubmitting] as const}>
-            {([enviando]) => (
-              <BotonPrincipal
-                disabled={enviando}
-                opacity={enviando ? 0.7 : 1}
-                icon={enviando ? <Spinner color="$primarioTexto" /> : undefined}
-                onPress={() => form.handleSubmit().catch(() => {})}
-              >
-                <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
-                  {identificar.isPaused ? 'Esperando conexión…' : 'Entrar'}
-                </Button.Text>
-              </BotonPrincipal>
-            )}
-          </form.Subscribe>
+          <YStack gap={12}>
+            <form.Subscribe selector={(estado) => [estado.isSubmitting] as const}>
+              {([enviando]) => (
+                <BotonPrincipal
+                  disabled={enviando}
+                  opacity={enviando ? 0.7 : 1}
+                  icon={enviando ? <Spinner color="$primarioTexto" /> : undefined}
+                  onPress={() => form.handleSubmit().catch(() => {})}
+                >
+                  <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
+                    {identificar.isPaused ? 'Esperando conexión…' : 'Entrar'}
+                  </Button.Text>
+                </BotonPrincipal>
+              )}
+            </form.Subscribe>
+            {/* Lo que pasa al entrar, antes de tocar: queda en servicio y su unidad empieza a figurar en el mapa. */}
+            <Paragraph color="$textoSecundario" fontSize={14} lineHeight={20} text="center">
+              Al entrar quedas en servicio: tu unidad aparece en el mapa y empiezas a recibir emergencias.
+            </Paragraph>
+          </YStack>
         </YStack>
       </ScrollView>
     </KeyboardAvoidingView>
