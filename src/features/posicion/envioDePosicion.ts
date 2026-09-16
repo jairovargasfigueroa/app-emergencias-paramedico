@@ -6,6 +6,7 @@ import type { Coordenadas } from '@/shared/formato/distancia'
 import { queryClient } from '@/shared/query/queryClient'
 
 import { posicionApi } from './api'
+import { cambiarEstadoUbicacion } from './estadoUbicacion'
 import { actualizarPosicionActual } from './posicionActual'
 
 /** Cada cuántos milisegundos se envía la posición mientras el paramédico está en servicio (PB-03 R4). */
@@ -24,6 +25,8 @@ export function coordenadasDe(posicion: Location.LocationObject): Coordenadas {
  */
 export async function registrarPosicion(paramedicoId: number, coordenadas: Coordenadas) {
   actualizarPosicionActual(coordenadas)
+  // Único punto por donde entran las posiciones, con la app abierta y en segundo plano.
+  cambiarEstadoUbicacion('activa')
   const ahora = Date.now()
   if (ahora - ultimoEnvio < INTERVALO_ENVIO_MS) {
     return
