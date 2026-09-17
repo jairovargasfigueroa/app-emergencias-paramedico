@@ -256,15 +256,16 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
           </ScrollView>
         ) : null}
 
+        {/* 48 px como mínimo: se tocan con guantes y con el vehículo en movimiento. */}
         <XStack items="center" justify="space-between" gap={10}>
-          <Button chromeless px={4} height={40} onPress={() => setDetallesAbiertos((abierto) => !abierto)}>
+          <Button chromeless px={4} height={48} onPress={() => setDetallesAbiertos((abierto) => !abierto)}>
             <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
               {detallesAbiertos ? 'Ocultar detalles' : 'Ver detalles del incidente'}
             </Button.Text>
           </Button>
           <Button
-            width={40}
-            height={40}
+            width={48}
+            height={48}
             p={0}
             rounded={12}
             bg="$superficie"
@@ -296,7 +297,10 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   )
 }
 
-/** Fila discreta con algo pendiente y opcional, sin robarle sitio al paso siguiente. */
+/**
+ * Fila discreta con algo pendiente y opcional, sin robarle sitio al paso siguiente. El botón ocupa todo el alto de la
+ * fila: 48 px para tocarlo con guantes sin que la fila crezca.
+ */
 function Tarea({
   texto,
   accion,
@@ -309,11 +313,11 @@ function Tarea({
   onPress: () => void
 }) {
   return (
-    <XStack items="center" justify="space-between" gap={10} px={12} py={11} rounded={12} bg="$fondo" borderWidth={1} borderColor="$borde">
+    <XStack items="center" justify="space-between" gap={10} pl={12} rounded={12} bg="$fondo" borderWidth={1} borderColor="$borde">
       <Text color={destacada ? '$texto' : '$textoSecundario'} fontSize={15} fontWeight={destacada ? '600' : '400'} numberOfLines={1} flex={1}>
         {texto}
       </Text>
-      <Button size="$2" chromeless onPress={onPress}>
+      <Button chromeless height={48} px={19} rounded={12} onPress={onPress}>
         <Button.Text color="$primarioPresionado" fontSize={15} fontWeight="600">
           {accion}
         </Button.Text>
