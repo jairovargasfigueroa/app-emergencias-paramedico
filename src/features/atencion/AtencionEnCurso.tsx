@@ -259,6 +259,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
       />
       <DialogoCancelar
         abierto={cancelando}
+        estado={atencion.estado}
         enviando={cancelacion.isPending}
         onConfirmar={cancelar}
         onCerrar={() => setCancelando(false)}

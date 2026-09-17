@@ -4,17 +4,33 @@ import { Button, H2, Label, Paragraph, RadioGroup, Sheet, Spinner, Text, XStack,
 
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 
-import type { MotivoCancelacion } from './api'
+import type { EstadoAtencion, MotivoCancelacion } from './api'
 
-const MOTIVOS: { valor: MotivoCancelacion; titulo: string; detalle?: string }[] = [
-  { valor: 'AVERIA', titulo: 'Avería', detalle: 'La ambulancia queda fuera de servicio' },
-  { valor: 'NO_SE_ENCONTRO_PACIENTE', titulo: 'No se encontró al paciente' },
-  { valor: 'DESVIADA', titulo: 'Desviada a otra emergencia' },
-  { valor: 'OTRO', titulo: 'Otro motivo' },
-]
+const MOTIVOS: Record<MotivoCancelacion, { titulo: string; detalle?: string }> = {
+  AVERIA: { titulo: 'Avería', detalle: 'La ambulancia queda fuera de servicio' },
+  NO_SE_ENCONTRO_PACIENTE: { titulo: 'No se encontró al paciente' },
+  DESVIADA: { titulo: 'Desviada a otra emergencia' },
+  OTRO: { titulo: 'Otro motivo' },
+}
+
+/**
+ * Motivos que se ofrecen en cada momento. El backend acepta los cuatro en cualquier estado activo (PB-05 R5); la app
+ * muestra solo los que tienen sentido: antes de llegar no se sabe si está el paciente, frente a él no se lo deja por
+ * otra emergencia y con el paciente a bordo no caben ni "no se encontró" ni "desviada".
+ */
+const MOTIVOS_POR_ESTADO: Record<EstadoAtencion, MotivoCancelacion[]> = {
+  EN_CAMINO: ['AVERIA', 'DESVIADA', 'OTRO'],
+  EN_EL_LUGAR: ['NO_SE_ENCONTRO_PACIENTE', 'AVERIA', 'OTRO'],
+  PACIENTE_RECOGIDO: ['AVERIA', 'OTRO'],
+  // Estados finales: ya no se cancelan (ME-1 A4).
+  PACIENTE_ENTREGADO: [],
+  CANCELADA: [],
+}
 
 type Props = {
   abierto: boolean
+  /** Estado de la atención: decide qué motivos se ofrecen. */
+  estado: EstadoAtencion
   enviando: boolean
   onConfirmar: (motivo: MotivoCancelacion) => void
   onCerrar: () => void
@@ -24,7 +40,7 @@ type Props = {
  * PB-05 R5 y CA-13: la cancelación exige un motivo; sin elegirlo no se puede confirmar. Todo llega por props: el
  * contenido se pinta en un portal.
  */
-export function DialogoCancelar({ abierto, enviando, onConfirmar, onCerrar }: Props) {
+export function DialogoCancelar({ abierto, estado, enviando, onConfirmar, onCerrar }: Props) {
   const margenes = useSafeAreaInsets()
   const [motivo, setMotivo] = useState<MotivoCancelacion | null>(null)
 
@@ -72,12 +88,13 @@ export function DialogoCancelar({ abierto, enviando, onConfirmar, onCerrar }: Pr
           gap={8}
           aria-label="Motivo de cancelación"
         >
-          {MOTIVOS.map((opcion) => {
-            const elegido = motivo === opcion.valor
-            const id = `motivo-${opcion.valor}`
+          {MOTIVOS_POR_ESTADO[estado].map((valor) => {
+            const opcion = MOTIVOS[valor]
+            const elegido = motivo === valor
+            const id = `motivo-${valor}`
             return (
               <XStack
-                key={opcion.valor}
+                key={valor}
                 items="center"
                 gap={12}
                 minH={52}
@@ -86,9 +103,9 @@ export function DialogoCancelar({ abierto, enviando, onConfirmar, onCerrar }: Pr
                 rounded={14}
                 borderWidth={elegido ? 2 : 1}
                 borderColor={elegido ? '$primario' : '$borde'}
-                onPress={() => setMotivo(opcion.valor)}
+                onPress={() => setMotivo(valor)}
               >
-                <RadioGroup.Item value={opcion.valor} id={id} size="$4" borderColor={elegido ? '$primario' : '$bordeFuerte'}>
+                <RadioGroup.Item value={valor} id={id} size="$4" borderColor={elegido ? '$primario' : '$bordeFuerte'}>
                   <RadioGroup.Indicator bg="$primario" />
                 </RadioGroup.Item>
                 <YStack flex={1} gap={2}>
