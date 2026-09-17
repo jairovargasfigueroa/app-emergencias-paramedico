@@ -38,6 +38,13 @@ export const identificarMutation = (queryClient: QueryClient) =>
     },
   })
 
+/** PB-05 CA-19: la ambulancia fuera de servicio por avería vuelve a DISPONIBLE. */
+export const reactivarAmbulanciaMutation = (queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: (ambulanciaId: number) => servicioApi.reactivarAmbulancia(ambulanciaId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['servicio'] }),
+  })
+
 /** Salir, o el backend ya no reconoce al paramédico guardado: la app vuelve a pedir la identificación. */
 export async function olvidarParamedico(queryClient: QueryClient) {
   await borrarParamedicoGuardado()

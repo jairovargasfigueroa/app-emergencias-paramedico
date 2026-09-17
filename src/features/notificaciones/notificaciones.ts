@@ -1,5 +1,6 @@
-import * as Notifications from 'expo-notifications'
+import { isRunningInExpoGo } from 'expo'
 import { router } from 'expo-router'
+import type { DevicePushToken, NotificationResponse } from 'expo-notifications'
 import { Platform } from 'react-native'
 
 import { servicioApi } from '@/features/servicio/api'
@@ -7,21 +8,45 @@ import { servicioApi } from '@/features/servicio/api'
 /** Canal de Android para los incidentes nuevos. app.json lo declara como canal por defecto de FCM. */
 export const CANAL_INCIDENTES = 'incidentes'
 
-// Con la app abierta, el push de un incidente nuevo también se muestra.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-})
+type ModuloNotificaciones = typeof import('expo-notifications')
+
+/**
+ * Expo Go para Android no trae push desde el SDK 53 y expo-notifications lanza un error apenas se importa. Por eso
+ * se carga solo donde hay push (development build, o iOS); en Expo Go para Android la app sigue sin push.
+ */
+const pushDisponible = !(Platform.OS === 'android' && isRunningInExpoGo())
+
+let moduloNotificaciones: Promise<ModuloNotificaciones | null> | null = null
+
+export function cargarNotificaciones(): Promise<ModuloNotificaciones | null> {
+  moduloNotificaciones ??= pushDisponible
+    ? import('expo-notifications')
+        .then((Notifications) => {
+          // Con la app abierta, el push de un incidente nuevo también se muestra.
+          Notifications.setNotificationHandler({
+            handleNotification: async () => ({
+              shouldShowBanner: true,
+              shouldShowList: true,
+              shouldPlaySound: true,
+              shouldSetBadge: false,
+            }),
+          })
+          return Notifications
+        })
+        .catch(() => null)
+    : Promise.resolve(null)
+  return moduloNotificaciones
+}
 
 /**
  * PB-03 R3: registra el token de FCM del teléfono para recibir los incidentes nuevos con la app cerrada. Un
- * dispositivo nuevo reemplaza al anterior. En Expo Go para Android no hay push: falla en silencio.
+ * dispositivo nuevo reemplaza al anterior. Sin push disponible no hace nada.
  */
 export async function registrarDispositivo(paramedicoId: number) {
+  const Notifications = await cargarNotificaciones()
+  if (!Notifications) {
+    return
+  }
   try {
     if (Platform.OS === 'android') {
       // El canal debe existir antes de pedir el permiso y el token.
@@ -44,7 +69,7 @@ export async function registrarDispositivo(paramedicoId: number) {
   }
 }
 
-export async function actualizarTokenDelDispositivo(paramedicoId: number, token: Notifications.DevicePushToken) {
+export async function actualizarTokenDelDispositivo(paramedicoId: number, token: DevicePushToken) {
   try {
     await servicioApi.registrarDispositivo(paramedicoId, String(token.data))
   } catch {
@@ -55,7 +80,7 @@ export async function actualizarTokenDelDispositivo(paramedicoId: number, token:
 const respuestasAtendidas = new Set<string>()
 
 /** Al tocar el push, abre el incidente. El backend manda su id en el campo `incidenteId` del mensaje. */
-export function abrirIncidenteDeNotificacion(respuesta: Notifications.NotificationResponse) {
+export function abrirIncidenteDeNotificacion(respuesta: NotificationResponse) {
   const identificador = respuesta.notification.request.identifier
   if (respuestasAtendidas.has(identificador)) {
     return

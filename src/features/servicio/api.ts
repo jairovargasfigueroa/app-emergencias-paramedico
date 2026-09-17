@@ -42,4 +42,6 @@ export const servicioApi = {
     api.get<ServicioActual>('/paramedicos/actual', { usuarioId: paramedicoId, signal }),
   registrarDispositivo: (paramedicoId: number, tokenPush: string) =>
     api.post<void>('/paramedicos/actual/dispositivo', { tokenPush }, { usuarioId: paramedicoId }),
+  /** ME-1 M5: tras una avería, el paramédico vuelve a poner la ambulancia DISPONIBLE (PB-05 R11). */
+  reactivarAmbulancia: (ambulanciaId: number) => api.post<Ambulancia>(`/ambulancias/${ambulanciaId}/reactivar`),
 }
