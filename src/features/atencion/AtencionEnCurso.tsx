@@ -2,7 +2,7 @@ import Feather from '@expo/vector-icons/Feather'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { useState } from 'react'
-import { StyleSheet, useColorScheme } from 'react-native'
+import { ScrollView, StyleSheet, useColorScheme, useWindowDimensions } from 'react-native'
 import MapView from 'react-native-maps'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button, Paragraph, Text, XStack, YStack, useTheme, useToastController } from 'tamagui'
@@ -38,12 +38,16 @@ const MENSAJES_CANCELACION: Record<MotivoCancelacion, string> = {
   OTRO: 'Tu ambulancia vuelve a estar disponible.',
 }
 
+/** Hasta qué parte del alto de la pantalla crecen los detalles abiertos; lo que no entra se desplaza. */
+const FRACCION_DETALLES = 0.4
+
 /**
  * PB-05: la atención en curso. Cada hito congela la hora y la ubicación del momento (R2) y no se deshace, así que se
  * confirma manteniendo presionado. Lo reversible se sigue tocando.
  */
 export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   const margenes = useSafeAreaInsets()
+  const { height: altoPantalla } = useWindowDimensions()
   const esquema = useColorScheme() === 'dark' ? 'dark' : 'light'
   const tema = useTheme()
   const queryClient = useQueryClient()
@@ -127,6 +131,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
 
   const sinPosicion = posicion === null
   const conPaciente = [atencion.nombrePaciente, atencion.documentoPaciente].filter(Boolean).join(' · ')
+  const descripciones = incidente?.descripciones ?? []
 
   return (
     <YStack flex={1} bg="$fondo">
@@ -214,18 +219,41 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
           </>
         ) : null}
 
+        {/* Con varios reportes puede no entrar todo: se desplaza adentro y el paso siguiente sigue a la vista. */}
         {detallesAbiertos ? (
-          <YStack gap={14} px={4} pt={4}>
-            <YStack gap={6}>
+          <ScrollView
+            style={{ maxHeight: altoPantalla * FRACCION_DETALLES }}
+            contentContainerStyle={{ gap: 14, paddingHorizontal: 4, paddingTop: 4 }}
+          >
+            {/* PB-03 R2: todas las descripciones, no solo la primera; pueden haber avisado varias personas. */}
+            <YStack gap={10}>
               <Text color="$texto" fontSize={14} fontWeight="600">
                 Lo que reportaron
               </Text>
-              <Paragraph color="$textoSecundario" fontSize={15} lineHeight={21}>
-                {incidente?.descripciones[0] ?? 'Todavía no dijeron qué pasó.'}
-              </Paragraph>
+              {descripciones.length === 0 ? (
+                <Paragraph color="$textoSecundario" fontSize={15} lineHeight={22}>
+                  Todavía no dijeron qué pasó.
+                </Paragraph>
+              ) : (
+                descripciones.map((descripcion, indice) => (
+                  <Paragraph
+                    key={indice}
+                    color="$texto"
+                    fontSize={15}
+                    lineHeight={22}
+                    px={14}
+                    py={12}
+                    rounded={12}
+                    borderWidth={1}
+                    borderColor="$borde"
+                  >
+                    {descripcion}
+                  </Paragraph>
+                ))
+              )}
             </YStack>
             <HitosAtencion atencion={atencion} />
-          </YStack>
+          </ScrollView>
         ) : null}
 
         <XStack items="center" justify="space-between" gap={10}>
