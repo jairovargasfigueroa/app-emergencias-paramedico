@@ -88,6 +88,8 @@ export function AccionesTomar({ incidente }: { incidente: IncidenteAbierto }) {
           alAcudir()
         },
         onError: (error) => {
+          // No se sumó: si vuelve a ver el diálogo y desiste, tiene que volver al mapa (PB-04 CA-05).
+          acudiendo.current = false
           setYaTomado(null)
           toast.show('No pudiste sumarte', { message: mensajeDeError(error) })
         },
