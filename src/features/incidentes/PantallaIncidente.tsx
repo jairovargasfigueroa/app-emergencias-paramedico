@@ -93,8 +93,8 @@ function DetalleIncidente({ incidente, acciones }: { incidente: IncidenteAbierto
           position="absolute"
           t={margenes.top + 12}
           l={16}
-          width={44}
-          height={44}
+          width={48}
+          height={48}
           p={0}
           rounded={999}
           bg="$superficie"

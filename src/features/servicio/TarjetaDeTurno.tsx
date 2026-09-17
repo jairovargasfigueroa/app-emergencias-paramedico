@@ -62,6 +62,7 @@ export function TarjetaDeTurno({ ambulancia, nombreParamedico }: Props) {
         {aviso?.conAccion ? (
           <Button
             size="$3"
+            height={48}
             rounded={10}
             bg="$primario"
             borderWidth={0}

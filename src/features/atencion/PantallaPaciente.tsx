@@ -99,8 +99,8 @@ function FormularioPaciente({ paramedicoId, atencion }: { paramedicoId: number; 
         >
           <XStack items="center" gap={12}>
             <Button
-              width={44}
-              height={44}
+              width={48}
+              height={48}
               p={0}
               rounded={999}
               bg="$superficie"
