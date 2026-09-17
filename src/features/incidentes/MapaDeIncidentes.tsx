@@ -140,7 +140,6 @@ export function MapaDeIncidentes({ ambulancia, nombreParamedico }: Props) {
           adjustPaddingForOffscreenContent
           gap={12}
           px={16}
-          pt={8}
           pb={margenes.bottom + 16}
           borderTopLeftRadius={22}
           borderTopRightRadius={22}
@@ -151,11 +150,14 @@ export function MapaDeIncidentes({ ambulancia, nombreParamedico }: Props) {
           shadowOffset={{ width: 0, height: -8 }}
           elevation={12}
         >
+          {/* La franja de arriba entera es el tirador (48 px, para guantes); el margen negativo descuenta el gap. */}
           <YStack
             role="button"
             aria-label={altura === COMPLETA ? 'Bajar la lista' : 'Subir la lista'}
             items="center"
-            py={6}
+            height={48}
+            pt={14}
+            mb={-12}
             onPress={() => setAltura(altura === COMPLETA ? ASOMADA : altura - 1)}
           >
             <YStack width={40} height={5} rounded={999} bg="$bordeFuerte" />
