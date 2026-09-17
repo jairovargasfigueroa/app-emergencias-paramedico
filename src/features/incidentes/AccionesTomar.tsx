@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { router } from 'expo-router'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button, Paragraph, Spinner, useToastController } from 'tamagui'
 
 import { paramedicoGuardadoQuery, servicioActualQuery } from '@/features/servicio/queries'
@@ -9,6 +8,7 @@ import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 
 import { incidenteYaTomado, type IncidenteAbierto, type IncidenteYaTomado } from './api'
 import { DialogoSumarse } from './DialogoSumarse'
+import { volverAlMapa } from './PantallaIncidente'
 import { sumarseAIncidenteMutation, tomarIncidenteMutation } from './queries'
 
 /** PB-04 R5: solo una ambulancia disponible y activa puede tomar o sumarse. Explica por qué no. */
@@ -34,15 +34,25 @@ export function AccionesTomar({ incidente }: { incidente: IncidenteAbierto }) {
   const tomar = useMutation(tomarIncidenteMutation(queryClient))
   const sumarse = useMutation(sumarseAIncidenteMutation(queryClient))
   const [yaTomado, setYaTomado] = useState<IncidenteYaTomado | null>(null)
+  // El diálogo también se cierra al sumarse: así no se confunde con desistir, que sí vuelve al mapa.
+  const acudiendo = useRef(false)
 
   const motivo = servicio.data
     ? motivoNoDisponible(servicio.data.enServicio, servicio.data.ambulancia?.estado)
     : null
   const puedeAcudir = servicio.data !== undefined && motivo === null
 
+  /** Sin aviso: la app entra directo a la pantalla de atención, que ya muestra a dónde va. */
   function alAcudir() {
-    toast.show('Vas en camino', { message: 'Tu atención quedó registrada.' })
-    router.dismissTo('/')
+    volverAlMapa()
+  }
+
+  /** PB-04 CA-05: desistir no registra nada y devuelve al mapa, en vez de dejarlo en el detalle. */
+  function desistir() {
+    setYaTomado(null)
+    if (!acudiendo.current) {
+      volverAlMapa()
+    }
   }
 
   function tomarIncidente() {
@@ -69,6 +79,7 @@ export function AccionesTomar({ incidente }: { incidente: IncidenteAbierto }) {
     if (!paramedico || !yaTomado) {
       return
     }
+    acudiendo.current = true
     sumarse.mutate(
       { paramedicoId: paramedico.id, incidenteId: yaTomado.incidenteId },
       {
@@ -98,16 +109,11 @@ export function AccionesTomar({ incidente }: { incidente: IncidenteAbierto }) {
         onPress={tomarIncidente}
       >
         <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
-          {tomar.isPaused ? 'Esperando conexión…' : 'Tomar incidente'}
+          {tomar.isPaused ? 'Esperando conexión…' : 'Voy a este incidente'}
         </Button.Text>
       </BotonPrincipal>
 
-      <DialogoSumarse
-        contexto={yaTomado}
-        enviando={sumarse.isPending}
-        onSumarse={sumarme}
-        onDesistir={() => setYaTomado(null)}
-      />
+      <DialogoSumarse contexto={yaTomado} enviando={sumarse.isPending} onSumarse={sumarme} onDesistir={desistir} />
     </>
   )
 }

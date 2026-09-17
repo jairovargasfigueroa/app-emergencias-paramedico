@@ -9,6 +9,7 @@ import { ErrorApi, mensajeDeError } from '@/shared/api/cliente'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 import { PantallaDeEstado } from '@/shared/ui/PantallaDeEstado'
 
+import { AvisoDeServicio } from './AvisoDeServicio'
 import { olvidarParamedico, paramedicoGuardadoQuery, servicioActualQuery } from './queries'
 
 /**
@@ -51,8 +52,8 @@ export function PantallaInicio() {
   if (!enServicio || !ambulancia) {
     return (
       <PantallaDeEstado
-        titulo="Sin ambulancia asignada"
-        descripcion="Pide al administrador que te asigne una ambulancia activa para empezar el servicio."
+        titulo="Todavía no tienes unidad"
+        descripcion="Pídele al administrador que te asigne una ambulancia activa. Cuando lo haga, toca Actualizar y quedas en servicio."
       >
         <BotonPrincipal disabled={servicio.isFetching} onPress={() => servicio.refetch()}>
           <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
@@ -84,9 +85,14 @@ export function PantallaInicio() {
     )
   }
 
-  if (atencion.data) {
-    return <AtencionEnCurso paramedicoId={datosParamedico.id} atencion={atencion.data} ambulancia={ambulancia} />
-  }
-
-  return <MapaDeIncidentes ambulancia={ambulancia} nombreParamedico={datosParamedico.nombreCompleto} />
+  return (
+    <>
+      {atencion.data ? (
+        <AtencionEnCurso paramedicoId={datosParamedico.id} atencion={atencion.data} />
+      ) : (
+        <MapaDeIncidentes ambulancia={ambulancia} nombreParamedico={datosParamedico.nombreCompleto} />
+      )}
+      <AvisoDeServicio paramedicoId={datosParamedico.id} placa={ambulancia.placa} />
+    </>
+  )
 }

@@ -8,6 +8,9 @@ import { servicioApi } from '@/features/servicio/api'
 /** Canal de Android para los incidentes nuevos. app.json lo declara como canal por defecto de FCM. */
 export const CANAL_INCIDENTES = 'incidentes'
 
+/** Marca del aviso fijo de la atención en curso, para distinguirlo de un incidente nuevo. */
+export const TIPO_ATENCION_EN_CURSO = 'atencion-en-curso'
+
 type ModuloNotificaciones = typeof import('expo-notifications')
 
 /**
@@ -22,14 +25,18 @@ export function cargarNotificaciones(): Promise<ModuloNotificaciones | null> {
   moduloNotificaciones ??= pushDisponible
     ? import('expo-notifications')
         .then((Notifications) => {
-          // Con la app abierta, el push de un incidente nuevo también se muestra.
           Notifications.setNotificationHandler({
-            handleNotification: async () => ({
-              shouldShowBanner: true,
-              shouldShowList: true,
-              shouldPlaySound: true,
-              shouldSetBadge: false,
-            }),
+            handleNotification: async (notificacion) => {
+              // El aviso fijo de la atención en curso no suena ni salta: es un recordatorio, no una alerta.
+              const fijo = notificacion.request.content.data?.tipo === TIPO_ATENCION_EN_CURSO
+              return {
+                // Con la app abierta, el push de un incidente nuevo también se muestra.
+                shouldShowBanner: !fijo,
+                shouldShowList: true,
+                shouldPlaySound: !fijo,
+                shouldSetBadge: false,
+              }
+            },
           })
           return Notifications
         })

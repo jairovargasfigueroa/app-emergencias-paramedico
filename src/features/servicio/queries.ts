@@ -1,11 +1,18 @@
 import { mutationOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
 
-import { borrarParamedicoGuardado, guardarParamedico, leerParamedicoGuardado } from './almacen'
+import {
+  borrarParamedicoGuardado,
+  guardarAvisoDeServicioVisto,
+  guardarParamedico,
+  leerAvisoDeServicioVisto,
+  leerParamedicoGuardado,
+} from './almacen'
 import { servicioApi } from './api'
 
 export const servicioKeys = {
   paramedico: ['paramedico'] as const,
   actual: (paramedicoId: number) => ['servicio', paramedicoId] as const,
+  avisoVisto: (paramedicoId: number) => ['aviso-servicio', paramedicoId] as const,
 }
 
 /** Paramédico identificado en este teléfono, o `null`. Se lee del almacén local: no depende de la conexión. */
@@ -23,6 +30,24 @@ export const servicioActualQuery = (paramedicoId: number) =>
   queryOptions({
     queryKey: servicioKeys.actual(paramedicoId),
     queryFn: ({ signal }) => servicioApi.actual(paramedicoId, signal),
+  })
+
+/** Aviso de una sola vez sobre compartir la ubicación durante el turno. Se lee del almacén local. */
+export const avisoDeServicioVistoQuery = (paramedicoId: number) =>
+  queryOptions({
+    queryKey: servicioKeys.avisoVisto(paramedicoId),
+    queryFn: () => leerAvisoDeServicioVisto(paramedicoId),
+    networkMode: 'always',
+    staleTime: Infinity,
+    gcTime: Infinity,
+  })
+
+export const marcarAvisoDeServicioVistoMutation = (queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: (paramedicoId: number) => guardarAvisoDeServicioVisto(paramedicoId),
+    onSuccess: (_resultado, paramedicoId) => {
+      queryClient.setQueryData(servicioKeys.avisoVisto(paramedicoId), true)
+    },
   })
 
 export const identificarMutation = (queryClient: QueryClient) =>
