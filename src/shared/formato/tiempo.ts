@@ -1,14 +1,19 @@
-/** "hace 40 s", "hace 4 min", "hace 2 h" desde una fecha ISO hasta `ahora`. */
-export function tiempoTranscurrido(iso: string, ahora: number = Date.now()): string {
+/** "40 s", "4 min", "2 h" desde una fecha ISO hasta `ahora`. */
+export function duracionDesde(iso: string, ahora: number = Date.now()): string {
   const segundos = Math.max(0, Math.floor((ahora - new Date(iso).getTime()) / 1000))
   if (segundos < 60) {
-    return `hace ${segundos} s`
+    return `${segundos} s`
   }
   const minutos = Math.floor(segundos / 60)
   if (minutos < 60) {
-    return `hace ${minutos} min`
+    return `${minutos} min`
   }
-  return `hace ${Math.floor(minutos / 60)} h`
+  return `${Math.floor(minutos / 60)} h`
+}
+
+/** "hace 40 s", "hace 4 min", "hace 2 h" desde una fecha ISO hasta `ahora`. */
+export function tiempoTranscurrido(iso: string, ahora: number = Date.now()): string {
+  return `hace ${duracionDesde(iso, ahora)}`
 }
 
 /** "14:36" en la hora local del teléfono. */

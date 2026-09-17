@@ -32,6 +32,23 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "SGA Paramédico usa tu ubicación para ordenar los incidentes por cercanía y compartir la posición de tu ambulancia.",
+          "locationAlwaysAndWhenInUsePermission": "SGA Paramédico sigue compartiendo la posición de tu ambulancia mientras estás en servicio, aunque la app quede en segundo plano.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#D92D20",
+          "defaultChannel": "incidentes"
+        }
       ]
     ],
     "experiments": {
