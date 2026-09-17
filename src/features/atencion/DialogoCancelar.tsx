@@ -1,6 +1,7 @@
+import Feather from '@expo/vector-icons/Feather'
 import { useEffect, useState } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Button, H2, Label, Paragraph, RadioGroup, Sheet, Spinner, Text, XStack, YStack } from 'tamagui'
+import { Button, H2, Label, Paragraph, RadioGroup, Sheet, Spinner, Text, XStack, YStack, useTheme } from 'tamagui'
 
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 
@@ -42,6 +43,7 @@ type Props = {
  */
 export function DialogoCancelar({ abierto, estado, enviando, onConfirmar, onCerrar }: Props) {
   const margenes = useSafeAreaInsets()
+  const tema = useTheme()
   const [motivo, setMotivo] = useState<MotivoCancelacion | null>(null)
 
   useEffect(() => {
@@ -73,6 +75,21 @@ export function DialogoCancelar({ abierto, estado, enviando, onConfirmar, onCerr
         borderTopRightRadius={22}
         bg="$superficie"
       >
+        {/* Con el paciente a bordo, el aviso va antes de todo: se lee antes de elegir el motivo. */}
+        {estado === 'PACIENTE_RECOGIDO' ? (
+          <XStack gap={12} px={14} py={12} rounded={14} borderWidth={1} borderColor="$enAtencion" bg="$enAtencionTinte">
+            <Feather name="alert-triangle" size={20} color={tema.enAtencionTexto?.val} />
+            <YStack flex={1} gap={2}>
+              <Text color="$enAtencionTexto" fontSize={16} lineHeight={22} fontWeight="600">
+                Tienes un paciente a bordo
+              </Text>
+              <Paragraph color="$texto" fontSize={14} lineHeight={20}>
+                Cancela solo si la ambulancia no puede seguir o si otra unidad se hará cargo.
+              </Paragraph>
+            </YStack>
+          </XStack>
+        ) : null}
+
         <YStack gap={6}>
           <H2 color="$texto" fontSize={24} lineHeight={30} fontWeight="600">
             Cancelar atención
