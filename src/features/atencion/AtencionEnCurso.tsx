@@ -42,6 +42,12 @@ const MENSAJES_CANCELACION: Record<MotivoCancelacion, string> = {
 const FRACCION_DETALLES = 0.4
 
 /**
+ * A partir de esta distancia al incidente se recuerda cuánto falta antes de marcar la llegada: el hito congela la
+ * ubicación (PB-05 R2) y no se deshace. Es solo un aviso, nunca impide marcarla.
+ */
+const METROS_PARA_AVISAR_LA_DISTANCIA = 200
+
+/**
  * PB-05: la atención en curso. Cada hito congela la hora y la ubicación del momento (R2) y no se deshace, así que se
  * confirma manteniendo presionado. Lo reversible se sigue tocando.
  */
@@ -68,8 +74,11 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
     ...direccionIncidenteQuery(incidente ?? { id: atencion.incidenteId, latitud: 0, longitud: 0 }),
     enabled: incidente !== undefined,
   }).data
-  const distancia = posicion && incidente ? formatearDistancia(distanciaEnMetros(posicion, incidente)) : null
+  const metrosAlLugar = posicion && incidente ? distanciaEnMetros(posicion, incidente) : null
+  const distancia = metrosAlLugar === null ? null : formatearDistancia(metrosAlLugar)
   const lugar = tituloDelLugar(direccion, distancia)
+  const avisoDeDistancia =
+    metrosAlLugar !== null && metrosAlLugar > METROS_PARA_AVISAR_LA_DISTANCIA ? textoDeDistancia(metrosAlLugar) : null
 
   const [regionInicial] = useState(() => {
     const inicio = incidente ?? leerPosicionActual()
@@ -179,12 +188,19 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
         <YStack self="center" width={40} height={5} rounded={999} bg="$bordeFuerte" />
 
         {atencion.estado === 'EN_CAMINO' ? (
-          <MantenerPresionado
-            texto="Mantén presionado: llegué"
-            apagado={sinPosicion}
-            textoApagado="Esperando tu ubicación para poder marcar la llegada"
-            onCompletar={marcarLlegada}
-          />
+          <>
+            {avisoDeDistancia ? (
+              <Paragraph color="$textoSecundario" fontSize={14} lineHeight={20} text="center">
+                {avisoDeDistancia}
+              </Paragraph>
+            ) : null}
+            <MantenerPresionado
+              texto="Mantén presionado: llegué"
+              apagado={sinPosicion}
+              textoApagado="Esperando tu ubicación para poder marcar la llegada"
+              onCompletar={marcarLlegada}
+            />
+          </>
         ) : null}
 
         {atencion.estado === 'EN_EL_LUGAR' ? (
@@ -295,6 +311,12 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
       />
     </YStack>
   )
+}
+
+/** "Estás a 3,2 km del lugar": lo que falta para llegar, dicho igual que en el resto de la pantalla. */
+function textoDeDistancia(metros: number) {
+  const { valor, unidad } = formatearDistancia(metros)
+  return `Estás a ${valor} ${unidad} del lugar`
 }
 
 /**
