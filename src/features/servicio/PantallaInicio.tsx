@@ -4,6 +4,8 @@ import { Button } from 'tamagui'
 
 import { AtencionEnCurso } from '@/features/atencion/AtencionEnCurso'
 import { atencionActivaQuery } from '@/features/atencion/queries'
+import { BotonDemo } from '@/features/demo/BotonDemo'
+import { DEMO } from '@/features/demo/bandera'
 import { MapaDeIncidentes } from '@/features/incidentes/MapaDeIncidentes'
 import { ErrorApi, mensajeDeError } from '@/shared/api/cliente'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
@@ -93,6 +95,7 @@ export function PantallaInicio() {
         <MapaDeIncidentes ambulancia={ambulancia} nombreParamedico={datosParamedico.nombreCompleto} />
       )}
       <AvisoDeServicio paramedicoId={datosParamedico.id} placa={ambulancia.placa} />
+      {DEMO ? <BotonDemo /> : null}
     </>
   )
 }
