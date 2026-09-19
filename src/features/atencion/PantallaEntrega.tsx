@@ -93,12 +93,13 @@ export function PantallaEntrega() {
         },
       })
       .then((entregada) => {
-        // Los tres tiempos del servicio vienen en la respuesta: el cierre los muestra sin volver a consultar.
+        // Los tiempos del servicio vienen en la respuesta: el cierre los muestra sin volver a consultar.
         router.replace({
           pathname: '/atencion/cierre',
           params: {
             llegada: entregada.horaLlegada ?? '',
             recogida: entregada.horaRecogida ?? '',
+            hospital: entregada.horaLlegadaHospital ?? '',
             entrega: entregada.horaEntrega ?? '',
           },
         })

@@ -21,10 +21,13 @@ const MOTIVOS: Record<MotivoCancelacion, { titulo: string; detalle?: string }> =
  */
 const MOTIVOS_POR_ESTADO: Record<EstadoAtencion, MotivoCancelacion[]> = {
   EN_CAMINO: ['AVERIA', 'DESVIADA', 'OTRO'],
-  EN_EL_LUGAR: ['NO_SE_ENCONTRO_PACIENTE', 'AVERIA', 'OTRO'],
+  // Ya no se ofrece "no se encontró al paciente": eso es terminar sin trasladar, no cancelar.
+  EN_EL_LUGAR: ['AVERIA', 'OTRO'],
   PACIENTE_RECOGIDO: ['AVERIA', 'OTRO'],
+  EN_HOSPITAL: ['AVERIA', 'OTRO'],
   // Estados finales: ya no se cancelan (ME-1 A4).
   PACIENTE_ENTREGADO: [],
+  SIN_TRASLADO: [],
   CANCELADA: [],
 }
 
