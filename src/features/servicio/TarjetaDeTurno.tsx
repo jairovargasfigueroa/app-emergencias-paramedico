@@ -12,13 +12,14 @@ import { HojaDeTurno } from './HojaDeTurno'
 type Props = {
   ambulancia: Ambulancia
   nombreParamedico: string
+  inicioTurno: string
 }
 
 /**
  * Tarjeta superior del mapa: es el acceso al turno. Si la ubicación no está llegando se pone en tono de aviso y lo
  * dice ahí mismo, con el acceso para activarla; antes fallaba en silencio.
  */
-export function TarjetaDeTurno({ ambulancia, nombreParamedico }: Props) {
+export function TarjetaDeTurno({ ambulancia, nombreParamedico, inicioTurno }: Props) {
   const tema = useTheme()
   const [hojaAbierta, setHojaAbierta] = useState(false)
   const aviso = avisoDeUbicacion(useEstadoUbicacion())
@@ -83,7 +84,12 @@ export function TarjetaDeTurno({ ambulancia, nombreParamedico }: Props) {
 
       {ambulancia.estado === 'FUERA_DE_SERVICIO' ? <AvisoFueraDeServicio ambulanciaId={ambulancia.id} /> : null}
 
-      <HojaDeTurno abierta={hojaAbierta} placa={ambulancia.placa} onCerrar={() => setHojaAbierta(false)} />
+      <HojaDeTurno
+        abierta={hojaAbierta}
+        placa={ambulancia.placa}
+        inicio={inicioTurno}
+        onCerrar={() => setHojaAbierta(false)}
+      />
     </YStack>
   )
 }

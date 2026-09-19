@@ -25,8 +25,8 @@ function avisoDe(estado: EstadoAtencion, destino: string): Aviso | null {
 }
 
 /** Mantiene el aviso fijo al día mientras haya una atención activa, y lo quita cuando termina. */
-export function useAvisoDeAtencion(paramedicoId: number, enServicio: boolean) {
-  const atencion = useQuery({ ...atencionActivaQuery(paramedicoId), enabled: enServicio }).data
+export function useAvisoDeAtencion(paramedicoId: number, enTurno: boolean) {
+  const atencion = useQuery({ ...atencionActivaQuery(paramedicoId), enabled: enTurno }).data
   const { incidentes } = useIncidentesAbiertos()
 
   const incidente = atencion ? incidentes.find((abierto) => abierto.id === atencion.incidenteId) : undefined

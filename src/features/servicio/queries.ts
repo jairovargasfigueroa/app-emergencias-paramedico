@@ -43,6 +43,19 @@ export const marcarAvisoDeServicioVistoMutation = (queryClient: QueryClient) =>
     },
   })
 
+/** El turno se refleja en el servicio, así que al abrirlo o cerrarlo se vuelve a consultar todo de una vez. */
+export const iniciarTurnoMutation = (queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: () => servicioApi.iniciarTurno(),
+    onSuccess: (_turno, _variables, _contexto) => queryClient.invalidateQueries({ queryKey: ['servicio'] }),
+  })
+
+export const terminarTurnoMutation = (queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: () => servicioApi.terminarTurno(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['servicio'] }),
+  })
+
 export const identificarMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: async (telefono: string) => {

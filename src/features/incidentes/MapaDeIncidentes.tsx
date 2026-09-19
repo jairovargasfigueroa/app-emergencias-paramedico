@@ -26,6 +26,8 @@ const ASOMADA = 2
 type Props = {
   ambulancia: Ambulancia
   nombreParamedico: string
+  /** Desde cuándo está en turno, para la hoja que se abre desde la tarjeta. */
+  inicioTurno: string
 }
 
 function abrirIncidente(id: number) {
@@ -43,7 +45,7 @@ function tituloLista(cantidad: number) {
  * PB-03 CA-01 a CA-03 y CA-06: todas las emergencias abiertas en el mapa y en la lista, de la más cercana a la más
  * lejana, actualizadas en tiempo real. La hoja se arrastra entre tres alturas y arranca según cuántas haya.
  */
-export function MapaDeIncidentes({ ambulancia, nombreParamedico }: Props) {
+export function MapaDeIncidentes({ ambulancia, nombreParamedico, inicioTurno }: Props) {
   const margenes = useSafeAreaInsets()
   const esquema = useColorScheme() === 'dark' ? 'dark' : 'light'
   const mapa = useRef<MapView>(null)
@@ -121,7 +123,7 @@ export function MapaDeIncidentes({ ambulancia, nombreParamedico }: Props) {
       </MapView>
 
       <YStack position="absolute" t={margenes.top + 12} l={16} r={16}>
-        <TarjetaDeTurno ambulancia={ambulancia} nombreParamedico={nombreParamedico} />
+        <TarjetaDeTurno ambulancia={ambulancia} nombreParamedico={nombreParamedico} inicioTurno={inicioTurno} />
       </YStack>
 
       {/* Hoja fija sobre el mapa: no se cierra nunca, solo cambia de altura. */}
