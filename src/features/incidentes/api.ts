@@ -32,10 +32,8 @@ export type IncidenteYaTomado = {
 
 /** La ambulancia no viaja en la petición: es la de la asignación vigente del paramédico (PB-04 R6). */
 export const incidentesApi = {
-  tomar: (paramedicoId: number, incidenteId: number) =>
-    api.post<Atencion>(`/incidentes/${incidenteId}/tomar`, undefined, { usuarioId: paramedicoId }),
-  sumarse: (paramedicoId: number, incidenteId: number) =>
-    api.post<Atencion>(`/incidentes/${incidenteId}/sumarse`, undefined, { usuarioId: paramedicoId }),
+  tomar: (incidenteId: number) => api.post<Atencion>(`/incidentes/${incidenteId}/tomar`),
+  sumarse: (incidenteId: number) => api.post<Atencion>(`/incidentes/${incidenteId}/sumarse`),
 }
 
 /** Devuelve el contexto si el error es el 409 de "otra unidad ya acude"; si no, `null`. */

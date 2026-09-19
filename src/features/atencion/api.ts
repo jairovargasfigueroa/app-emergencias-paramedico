@@ -49,17 +49,15 @@ export type Entrega = Ubicacion & {
 
 export const atencionApi = {
   /** Devuelve `undefined` (204) si la ambulancia del paramédico no tiene una atención activa. */
-  activa: (paramedicoId: number, signal?: AbortSignal) =>
-    api.get<Atencion | undefined>('/paramedicos/actual/atencion', { usuarioId: paramedicoId, signal }),
-  marcarLlegada: (paramedicoId: number, atencionId: number, ubicacion: Ubicacion) =>
-    api.post<Atencion>(`/atenciones/${atencionId}/llegada`, ubicacion, { usuarioId: paramedicoId }),
-  marcarRecogida: (paramedicoId: number, atencionId: number, datos: Ubicacion & DatosPaciente) =>
-    api.post<Atencion>(`/atenciones/${atencionId}/recogida`, datos, { usuarioId: paramedicoId }),
-  entregar: (paramedicoId: number, atencionId: number, datos: Entrega) =>
-    api.post<Atencion>(`/atenciones/${atencionId}/entrega`, datos, { usuarioId: paramedicoId }),
-  cancelar: (paramedicoId: number, atencionId: number, motivo: MotivoCancelacion) =>
-    api.post<Atencion>(`/atenciones/${atencionId}/cancelar`, { motivo }, { usuarioId: paramedicoId }),
-  actualizarPaciente: (paramedicoId: number, atencionId: number, datos: DatosPaciente) =>
-    api.post<Atencion>(`/atenciones/${atencionId}/paciente`, datos, { usuarioId: paramedicoId }),
+  activa: (signal?: AbortSignal) => api.get<Atencion | undefined>('/paramedicos/actual/atencion', { signal }),
+  marcarLlegada: (atencionId: number, ubicacion: Ubicacion) =>
+    api.post<Atencion>(`/atenciones/${atencionId}/llegada`, ubicacion),
+  marcarRecogida: (atencionId: number, datos: Ubicacion & DatosPaciente) =>
+    api.post<Atencion>(`/atenciones/${atencionId}/recogida`, datos),
+  entregar: (atencionId: number, datos: Entrega) => api.post<Atencion>(`/atenciones/${atencionId}/entrega`, datos),
+  cancelar: (atencionId: number, motivo: MotivoCancelacion) =>
+    api.post<Atencion>(`/atenciones/${atencionId}/cancelar`, { motivo }),
+  actualizarPaciente: (atencionId: number, datos: DatosPaciente) =>
+    api.post<Atencion>(`/atenciones/${atencionId}/paciente`, datos),
   centrosSalud: (signal?: AbortSignal) => api.get<CentroSalud[]>('/centros-salud', { signal }),
 }

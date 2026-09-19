@@ -35,7 +35,7 @@ export type AcudirAIncidente = {
  */
 export const tomarIncidenteMutation = (queryClient: QueryClient) =>
   mutationOptions({
-    mutationFn: ({ paramedicoId, incidenteId }: AcudirAIncidente) => incidentesApi.tomar(paramedicoId, incidenteId),
+    mutationFn: ({ paramedicoId, incidenteId }: AcudirAIncidente) => incidentesApi.tomar(incidenteId),
     onSuccess: (atencion, { paramedicoId }) => {
       aplicarAtencion(queryClient, paramedicoId, atencion)
       return queryClient.invalidateQueries({ queryKey: servicioKeys.actual(paramedicoId) })
@@ -45,7 +45,7 @@ export const tomarIncidenteMutation = (queryClient: QueryClient) =>
 /** PB-04 R4: sumarse crea una atención propia e independiente para la ambulancia del paramédico. */
 export const sumarseAIncidenteMutation = (queryClient: QueryClient) =>
   mutationOptions({
-    mutationFn: ({ paramedicoId, incidenteId }: AcudirAIncidente) => incidentesApi.sumarse(paramedicoId, incidenteId),
+    mutationFn: ({ paramedicoId, incidenteId }: AcudirAIncidente) => incidentesApi.sumarse(incidenteId),
     onSuccess: (atencion, { paramedicoId }) => {
       aplicarAtencion(queryClient, paramedicoId, atencion)
       return queryClient.invalidateQueries({ queryKey: servicioKeys.actual(paramedicoId) })

@@ -33,7 +33,7 @@ export async function registrarPosicion(paramedicoId: number, coordenadas: Coord
   }
   ultimoEnvio = ahora
   try {
-    await posicionApi.enviar(paramedicoId, coordenadas.latitud, coordenadas.longitud)
+    await posicionApi.enviar(coordenadas.latitud, coordenadas.longitud)
   } catch (error) {
     if (error instanceof ErrorApi && error.codigo === 'SIN_SERVICIO') {
       // El paramédico dejó de estar en servicio: se refresca para que la app deje de transmitir.

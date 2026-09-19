@@ -23,7 +23,7 @@ const ESTADOS_ACTIVOS: EstadoAtencion[] = ['EN_CAMINO', 'EN_EL_LUGAR', 'PACIENTE
 export const atencionActivaQuery = (paramedicoId: number) =>
   queryOptions({
     queryKey: atencionKeys.activa(paramedicoId),
-    queryFn: async ({ signal }) => (await atencionApi.activa(paramedicoId, signal)) ?? null,
+    queryFn: async ({ signal }) => (await atencionApi.activa(signal)) ?? null,
   })
 
 /** Catálogo de centros de salud. Puede estar vacío: la entrega nunca se bloquea por eso (PB-05 R4). */
@@ -55,7 +55,7 @@ type SobreAtencion = {
 export const marcarLlegadaMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: ({ paramedicoId, atencionId, ubicacion }: SobreAtencion & { ubicacion: Ubicacion }) =>
-      atencionApi.marcarLlegada(paramedicoId, atencionId, ubicacion),
+      atencionApi.marcarLlegada(atencionId, ubicacion),
     onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
   })
 
@@ -63,7 +63,7 @@ export const marcarLlegadaMutation = (queryClient: QueryClient) =>
 export const marcarRecogidaMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: ({ paramedicoId, atencionId, datos }: SobreAtencion & { datos: Ubicacion & DatosPaciente }) =>
-      atencionApi.marcarRecogida(paramedicoId, atencionId, datos),
+      atencionApi.marcarRecogida(atencionId, datos),
     onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
   })
 
@@ -71,7 +71,7 @@ export const marcarRecogidaMutation = (queryClient: QueryClient) =>
 export const entregarMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: ({ paramedicoId, atencionId, datos }: SobreAtencion & { datos: Entrega }) =>
-      atencionApi.entregar(paramedicoId, atencionId, datos),
+      atencionApi.entregar(atencionId, datos),
     onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
   })
 
@@ -79,7 +79,7 @@ export const entregarMutation = (queryClient: QueryClient) =>
 export const cancelarAtencionMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: ({ paramedicoId, atencionId, motivo }: SobreAtencion & { motivo: MotivoCancelacion }) =>
-      atencionApi.cancelar(paramedicoId, atencionId, motivo),
+      atencionApi.cancelar(atencionId, motivo),
     onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
   })
 
@@ -87,6 +87,6 @@ export const cancelarAtencionMutation = (queryClient: QueryClient) =>
 export const actualizarPacienteMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: ({ paramedicoId, atencionId, datos }: SobreAtencion & { datos: DatosPaciente }) =>
-      atencionApi.actualizarPaciente(paramedicoId, atencionId, datos),
+      atencionApi.actualizarPaciente(atencionId, datos),
     onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
   })

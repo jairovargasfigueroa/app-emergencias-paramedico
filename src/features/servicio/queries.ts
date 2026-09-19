@@ -1,35 +1,28 @@
 import { mutationOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
 
-import {
-  borrarParamedicoGuardado,
-  guardarAvisoDeServicioVisto,
-  guardarParamedico,
-  leerAvisoDeServicioVisto,
-  leerParamedicoGuardado,
-} from './almacen'
+import { guardarSesion } from '@/shared/sesion/almacen'
+import { cerrarSesion, sesionKeys, sesionQuery } from '@/shared/sesion/queries'
+
+import { guardarAvisoDeServicioVisto, leerAvisoDeServicioVisto, type ParamedicoGuardado } from './almacen'
 import { servicioApi } from './api'
 
 export const servicioKeys = {
-  paramedico: ['paramedico'] as const,
   actual: (paramedicoId: number) => ['servicio', paramedicoId] as const,
   avisoVisto: (paramedicoId: number) => ['aviso-servicio', paramedicoId] as const,
 }
 
-/** Paramédico identificado en este teléfono, o `null`. Se lee del almacén local: no depende de la conexión. */
+/** Paramédico identificado en este teléfono, o `null`: es la sesión guardada, vista desde el servicio. */
 export const paramedicoGuardadoQuery = () =>
   queryOptions({
-    queryKey: servicioKeys.paramedico,
-    queryFn: leerParamedicoGuardado,
-    networkMode: 'always',
-    staleTime: Infinity,
-    gcTime: Infinity,
+    ...sesionQuery<ParamedicoGuardado>(),
+    select: (sesion) => sesion?.usuario ?? null,
   })
 
 /** Ambulancia asignada y si el paramédico está en servicio (PB-03 R4). */
 export const servicioActualQuery = (paramedicoId: number) =>
   queryOptions({
     queryKey: servicioKeys.actual(paramedicoId),
-    queryFn: ({ signal }) => servicioApi.actual(paramedicoId, signal),
+    queryFn: ({ signal }) => servicioApi.actual(signal),
   })
 
 /** Aviso de una sola vez sobre compartir la ubicación durante el turno. Se lee del almacén local. */
@@ -53,13 +46,13 @@ export const marcarAvisoDeServicioVistoMutation = (queryClient: QueryClient) =>
 export const identificarMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: async (telefono: string) => {
-      const paramedico = await servicioApi.identificar(telefono)
-      const guardado = { id: paramedico.id, nombreCompleto: paramedico.nombreCompleto }
-      await guardarParamedico(guardado)
-      return guardado
+      const { token, paramedico } = await servicioApi.identificar(telefono)
+      const sesion = { token, usuario: { id: paramedico.id, nombreCompleto: paramedico.nombreCompleto } }
+      await guardarSesion(sesion)
+      return sesion
     },
-    onSuccess: (guardado) => {
-      queryClient.setQueryData(servicioKeys.paramedico, guardado)
+    onSuccess: (sesion) => {
+      queryClient.setQueryData(sesionKeys.actual, sesion)
     },
   })
 
@@ -72,7 +65,6 @@ export const reactivarAmbulanciaMutation = (queryClient: QueryClient) =>
 
 /** Salir, o el backend ya no reconoce al paramédico guardado: la app vuelve a pedir la identificación. */
 export async function olvidarParamedico(queryClient: QueryClient) {
-  await borrarParamedicoGuardado()
   queryClient.removeQueries({ queryKey: ['servicio'] })
-  queryClient.setQueryData(servicioKeys.paramedico, null)
+  await cerrarSesion(queryClient)
 }

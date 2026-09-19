@@ -1,7 +1,8 @@
 import * as Location from 'expo-location'
 import * as TaskManager from 'expo-task-manager'
 
-import { leerParamedicoGuardado } from '@/features/servicio/almacen'
+import type { ParamedicoGuardado } from '@/features/servicio/almacen'
+import { leerSesion } from '@/shared/sesion/almacen'
 
 import { coordenadasDe, INTERVALO_ENVIO_MS, registrarPosicion } from './envioDePosicion'
 
@@ -15,11 +16,12 @@ try {
     if (error || !data?.locations?.length) {
       return
     }
-    const paramedico = await leerParamedicoGuardado()
-    if (!paramedico) {
+    // Sin sesión abierta no hay a quién atribuir la posición ni token con que enviarla.
+    const sesion = await leerSesion<ParamedicoGuardado>()
+    if (!sesion) {
       return
     }
-    await registrarPosicion(paramedico.id, coordenadasDe(data.locations[data.locations.length - 1]))
+    await registrarPosicion(sesion.usuario.id, coordenadasDe(data.locations[data.locations.length - 1]))
   })
 } catch {
   // Expo Go no ejecuta tareas en segundo plano: queda solo el envío con la app abierta.
