@@ -61,9 +61,12 @@ export function PantallaEntrega() {
     return <PantallaDeEstado cargando />
   }
 
-  if (!paramedico || !atencion.data || atencion.data.estado !== 'PACIENTE_RECOGIDO') {
+  if (!paramedico || !atencion.data || atencion.data.estado !== 'EN_HOSPITAL') {
     return (
-      <PantallaDeEstado titulo="No hay un paciente por entregar" descripcion="La entrega se marca después de la recogida.">
+      <PantallaDeEstado
+        titulo="No hay un paciente por entregar"
+        descripcion="La entrega se marca después de llegar al centro de salud."
+      >
         <BotonPrincipal onPress={volver}>
           <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
             Volver

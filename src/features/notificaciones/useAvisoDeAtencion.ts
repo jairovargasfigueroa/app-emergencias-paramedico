@@ -18,7 +18,13 @@ function avisoDe(estado: EstadoAtencion, destino: string): Aviso | null {
     case 'EN_EL_LUGAR':
       return { titulo: `En el lugar · ${destino}`, cuerpo: 'Toca para volver y marcar al paciente a bordo' }
     case 'PACIENTE_RECOGIDO':
-      return { titulo: 'Paciente a bordo', cuerpo: 'Toca para volver y entregar al paciente' }
+      return { titulo: 'Paciente a bordo', cuerpo: 'Toca para volver y marcar la llegada al hospital' }
+    case 'EN_HOSPITAL':
+      return { titulo: 'En el centro de salud', cuerpo: 'Toca para volver y entregar al paciente' }
+    case 'PACIENTE_ENTREGADO':
+      return { titulo: 'Paciente entregado', cuerpo: 'Tu unidad sigue ocupada: toca para liberarla' }
+    case 'SIN_TRASLADO':
+      return { titulo: 'Atención terminada', cuerpo: 'Tu unidad sigue ocupada: toca para liberarla' }
     default:
       return null
   }
