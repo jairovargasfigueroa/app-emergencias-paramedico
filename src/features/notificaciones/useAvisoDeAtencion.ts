@@ -18,15 +18,21 @@ function avisoDe(estado: EstadoAtencion, destino: string): Aviso | null {
     case 'EN_EL_LUGAR':
       return { titulo: `En el lugar · ${destino}`, cuerpo: 'Toca para volver y marcar al paciente a bordo' }
     case 'PACIENTE_RECOGIDO':
-      return { titulo: 'Paciente a bordo', cuerpo: 'Toca para volver y entregar al paciente' }
+      return { titulo: 'Paciente a bordo', cuerpo: 'Toca para volver y marcar la llegada al hospital' }
+    case 'EN_HOSPITAL':
+      return { titulo: 'En el centro de salud', cuerpo: 'Toca para volver y entregar al paciente' }
+    case 'PACIENTE_ENTREGADO':
+      return { titulo: 'Paciente entregado', cuerpo: 'Tu unidad sigue ocupada: toca para liberarla' }
+    case 'SIN_TRASLADO':
+      return { titulo: 'Atención terminada', cuerpo: 'Tu unidad sigue ocupada: toca para liberarla' }
     default:
       return null
   }
 }
 
 /** Mantiene el aviso fijo al día mientras haya una atención activa, y lo quita cuando termina. */
-export function useAvisoDeAtencion(paramedicoId: number, enServicio: boolean) {
-  const atencion = useQuery({ ...atencionActivaQuery(paramedicoId), enabled: enServicio }).data
+export function useAvisoDeAtencion(paramedicoId: number, enTurno: boolean) {
+  const atencion = useQuery({ ...atencionActivaQuery(paramedicoId), enabled: enTurno }).data
   const { incidentes } = useIncidentesAbiertos()
 
   const incidente = atencion ? incidentes.find((abierto) => abierto.id === atencion.incidenteId) : undefined

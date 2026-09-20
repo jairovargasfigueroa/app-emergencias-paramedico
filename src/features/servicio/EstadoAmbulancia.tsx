@@ -3,6 +3,7 @@ import { Insignia, type TonoInsignia } from '@/shared/ui/Insignia'
 import type { EstadoAmbulancia as Estado } from './api'
 
 const VISTAS: Record<Estado, { tono: TonoInsignia; texto: string }> = {
+  SIN_TURNO: { tono: 'gris', texto: 'Sin turno' },
   DISPONIBLE: { tono: 'verde', texto: 'Disponible' },
   EN_ATENCION: { tono: 'ambar', texto: 'En atención' },
   FUERA_DE_SERVICIO: { tono: 'gris', texto: 'Fuera de servicio' },

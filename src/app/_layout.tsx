@@ -105,6 +105,8 @@ function Pantallas() {
           <Stack.Screen name="atencion/entrega" />
           <Stack.Screen name="atencion/paciente" />
           <Stack.Screen name="atencion/cierre" />
+          <Stack.Screen name="demo/index" />
+          <Stack.Screen name="demo/recorrido" />
         </Stack.Protected>
         <Stack.Protected guard={!identificado}>
           <Stack.Screen name="identificacion" />

@@ -21,17 +21,33 @@ export function TarjetaDeAtencion({ atencion, lugar, distancia, unidadesAcudiend
   const enCamino = atencion.estado === 'EN_CAMINO'
   const enElLugar = atencion.estado === 'EN_EL_LUGAR'
 
-  const encabezado = enCamino
-    ? 'Vas a'
-    : enElLugar
-      ? `Atención en curso · ${atencion.placa}`
-      : `Paciente a bordo desde las ${horaCorta(atencion.horaRecogida ?? atencion.horaToma)} · ${atencion.placa}`
-
-  const titulo = enCamino
-    ? lugar
-    : enElLugar
-      ? `En el lugar desde las ${horaCorta(atencion.horaLlegada ?? atencion.horaToma)}`
-      : 'En traslado'
+  // Un switch y no una cadena de ternarios: así agregar un estado obliga a decidir qué dice la tarjeta.
+  const { encabezado, titulo } = ((): { encabezado: string; titulo: string } => {
+    switch (atencion.estado) {
+      case 'EN_CAMINO':
+        return { encabezado: 'Vas a', titulo: lugar }
+      case 'EN_EL_LUGAR':
+        return {
+          encabezado: `Atención en curso · ${atencion.placa}`,
+          titulo: `En el lugar desde las ${horaCorta(atencion.horaLlegada ?? atencion.horaToma)}`,
+        }
+      case 'PACIENTE_RECOGIDO':
+        return {
+          encabezado: `Paciente a bordo desde las ${horaCorta(atencion.horaRecogida ?? atencion.horaToma)} · ${atencion.placa}`,
+          titulo: 'En traslado',
+        }
+      case 'EN_HOSPITAL':
+        return {
+          encabezado: `Llegaste a las ${horaCorta(atencion.horaLlegadaHospital ?? atencion.horaToma)} · ${atencion.placa}`,
+          titulo: 'En el centro de salud',
+        }
+      case 'SIN_TRASLADO':
+        return { encabezado: `Atención terminada · ${atencion.placa}`, titulo: 'Sin traslado' }
+      default:
+        // Entregado y cancelada: la atención terminó pero la unidad sigue tomada hasta liberarse.
+        return { encabezado: `Atención terminada · ${atencion.placa}`, titulo: 'Paciente entregado' }
+    }
+  })()
 
   return (
     <XStack
@@ -67,6 +83,14 @@ export function TarjetaDeAtencion({ atencion, lugar, distancia, unidadesAcudiend
       {enElLugar ? <Insignia tono="verde">Llegaste</Insignia> : null}
       {atencion.estado === 'PACIENTE_RECOGIDO' ? (
         <Insignia tono="ambar">{duracionDesde(atencion.horaRecogida ?? atencion.horaToma, ahora)}</Insignia>
+      ) : null}
+      {atencion.estado === 'EN_HOSPITAL' ? (
+        <Insignia tono="ambar">{duracionDesde(atencion.horaLlegadaHospital ?? atencion.horaToma, ahora)}</Insignia>
+      ) : null}
+      {/* La unidad sigue tomada mientras no se libere: el aviso tiene que decirlo. */}
+      {atencion.horaLiberacion === null &&
+      (atencion.estado === 'PACIENTE_ENTREGADO' || atencion.estado === 'SIN_TRASLADO') ? (
+        <Insignia tono="ambar">Sin liberar</Insignia>
       ) : null}
     </XStack>
   )

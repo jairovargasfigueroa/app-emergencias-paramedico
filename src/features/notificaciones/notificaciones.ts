@@ -70,7 +70,7 @@ export async function registrarDispositivo(paramedicoId: number) {
       return
     }
     const token = await Notifications.getDevicePushTokenAsync()
-    await servicioApi.registrarDispositivo(paramedicoId, String(token.data))
+    await servicioApi.registrarDispositivo(String(token.data))
   } catch {
     // Sin push disponible: los incidentes igual llegan en tiempo real con la app abierta.
   }
@@ -78,7 +78,7 @@ export async function registrarDispositivo(paramedicoId: number) {
 
 export async function actualizarTokenDelDispositivo(paramedicoId: number, token: DevicePushToken) {
   try {
-    await servicioApi.registrarDispositivo(paramedicoId, String(token.data))
+    await servicioApi.registrarDispositivo(String(token.data))
   } catch {
     // Se vuelve a registrar la próxima vez que se abra la app.
   }

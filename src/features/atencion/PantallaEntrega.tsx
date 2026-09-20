@@ -61,9 +61,12 @@ export function PantallaEntrega() {
     return <PantallaDeEstado cargando />
   }
 
-  if (!paramedico || !atencion.data || atencion.data.estado !== 'PACIENTE_RECOGIDO') {
+  if (!paramedico || !atencion.data || atencion.data.estado !== 'EN_HOSPITAL') {
     return (
-      <PantallaDeEstado titulo="No hay un paciente por entregar" descripcion="La entrega se marca después de la recogida.">
+      <PantallaDeEstado
+        titulo="No hay un paciente por entregar"
+        descripcion="La entrega se marca después de llegar al centro de salud."
+      >
         <BotonPrincipal onPress={volver}>
           <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
             Volver
@@ -93,12 +96,13 @@ export function PantallaEntrega() {
         },
       })
       .then((entregada) => {
-        // Los tres tiempos del servicio vienen en la respuesta: el cierre los muestra sin volver a consultar.
+        // Los tiempos del servicio vienen en la respuesta: el cierre los muestra sin volver a consultar.
         router.replace({
           pathname: '/atencion/cierre',
           params: {
             llegada: entregada.horaLlegada ?? '',
             recogida: entregada.horaRecogida ?? '',
+            hospital: entregada.horaLlegadaHospital ?? '',
             entrega: entregada.horaEntrega ?? '',
           },
         })
@@ -116,8 +120,8 @@ export function PantallaEntrega() {
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, gap: 22 }} keyboardShouldPersistTaps="handled">
           <XStack items="center" gap={12}>
             <Button
-              width={44}
-              height={44}
+              width={48}
+              height={48}
               p={0}
               rounded={999}
               bg="$superficie"

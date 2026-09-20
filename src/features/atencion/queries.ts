@@ -7,8 +7,8 @@ import {
   type Atencion,
   type DatosPaciente,
   type Entrega,
-  type EstadoAtencion,
   type MotivoCancelacion,
+  type MotivoSinTraslado,
   type Ubicacion,
 } from './api'
 
@@ -17,13 +17,19 @@ export const atencionKeys = {
   centrosSalud: ['centros-salud'] as const,
 }
 
-const ESTADOS_ACTIVOS: EstadoAtencion[] = ['EN_CAMINO', 'EN_EL_LUGAR', 'PACIENTE_RECOGIDO']
+/**
+ * La atención tiene tomada a la unidad hasta que se libera, no hasta que entrega: entre dejar al paciente y quedar
+ * libre pasan la entrega al médico y la limpieza.
+ */
+function ocupaLaUnidad(atencion: Atencion) {
+  return atencion.estado !== 'CANCELADA' && atencion.horaLiberacion === null
+}
 
 /** Atención activa de la ambulancia del paramédico, o `null` si no tiene. */
 export const atencionActivaQuery = (paramedicoId: number) =>
   queryOptions({
     queryKey: atencionKeys.activa(paramedicoId),
-    queryFn: async ({ signal }) => (await atencionApi.activa(paramedicoId, signal)) ?? null,
+    queryFn: async ({ signal }) => (await atencionApi.activa(signal)) ?? null,
   })
 
 /** Catálogo de centros de salud. Puede estar vacío: la entrega nunca se bloquea por eso (PB-05 R4). */
@@ -35,13 +41,13 @@ export const centrosSaludQuery = () =>
   })
 
 /**
- * Tras cada transición: si la atención sigue activa se guarda tal cual; si se entregó o canceló, la ambulancia cambió
- * de estado y se vuelve a consultar el servicio.
+ * Tras cada transición: mientras la atención siga ocupando a la unidad se guarda tal cual; al liberarse o cancelarse,
+ * la ambulancia cambió de estado y se vuelve a consultar el servicio.
  */
 export function aplicarAtencion(queryClient: QueryClient, paramedicoId: number, atencion: Atencion) {
-  const activa = ESTADOS_ACTIVOS.includes(atencion.estado)
-  queryClient.setQueryData(atencionKeys.activa(paramedicoId), activa ? atencion : null)
-  if (!activa) {
+  const ocupada = ocupaLaUnidad(atencion)
+  queryClient.setQueryData(atencionKeys.activa(paramedicoId), ocupada ? atencion : null)
+  if (!ocupada) {
     void queryClient.invalidateQueries({ queryKey: servicioKeys.actual(paramedicoId) })
   }
 }
@@ -51,11 +57,34 @@ type SobreAtencion = {
   atencionId: number
 }
 
+/** Llegada al centro de salud con el paciente a bordo. La unidad sigue ocupada. */
+export const marcarLlegadaAlHospitalMutation = (queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: ({ atencionId, ubicacion }: SobreAtencion & { ubicacion: Ubicacion }) =>
+      atencionApi.marcarLlegadaAlHospital(atencionId, ubicacion),
+    onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
+  })
+
+/** La unidad fue y no trasladó a nadie. El motivo decide con qué estado cierra el incidente. */
+export const cerrarSinTrasladoMutation = (queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: ({ atencionId, datos }: SobreAtencion & { datos: Ubicacion & { motivo: MotivoSinTraslado } }) =>
+      atencionApi.cerrarSinTraslado(atencionId, datos),
+    onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
+  })
+
+/** La unidad termina de entregar, limpia y queda libre. Recién acá puede recibir otra emergencia. */
+export const liberarMutation = (queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: ({ atencionId }: SobreAtencion) => atencionApi.liberar(atencionId),
+    onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
+  })
+
 /** PB-05 CA-01: llegada, con la hora y la ubicación del momento. */
 export const marcarLlegadaMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: ({ paramedicoId, atencionId, ubicacion }: SobreAtencion & { ubicacion: Ubicacion }) =>
-      atencionApi.marcarLlegada(paramedicoId, atencionId, ubicacion),
+      atencionApi.marcarLlegada(atencionId, ubicacion),
     onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
   })
 
@@ -63,7 +92,7 @@ export const marcarLlegadaMutation = (queryClient: QueryClient) =>
 export const marcarRecogidaMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: ({ paramedicoId, atencionId, datos }: SobreAtencion & { datos: Ubicacion & DatosPaciente }) =>
-      atencionApi.marcarRecogida(paramedicoId, atencionId, datos),
+      atencionApi.marcarRecogida(atencionId, datos),
     onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
   })
 
@@ -71,7 +100,7 @@ export const marcarRecogidaMutation = (queryClient: QueryClient) =>
 export const entregarMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: ({ paramedicoId, atencionId, datos }: SobreAtencion & { datos: Entrega }) =>
-      atencionApi.entregar(paramedicoId, atencionId, datos),
+      atencionApi.entregar(atencionId, datos),
     onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
   })
 
@@ -79,7 +108,7 @@ export const entregarMutation = (queryClient: QueryClient) =>
 export const cancelarAtencionMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: ({ paramedicoId, atencionId, motivo }: SobreAtencion & { motivo: MotivoCancelacion }) =>
-      atencionApi.cancelar(paramedicoId, atencionId, motivo),
+      atencionApi.cancelar(atencionId, motivo),
     onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
   })
 
@@ -87,6 +116,6 @@ export const cancelarAtencionMutation = (queryClient: QueryClient) =>
 export const actualizarPacienteMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: ({ paramedicoId, atencionId, datos }: SobreAtencion & { datos: DatosPaciente }) =>
-      atencionApi.actualizarPaciente(paramedicoId, atencionId, datos),
+      atencionApi.actualizarPaciente(atencionId, datos),
     onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
   })

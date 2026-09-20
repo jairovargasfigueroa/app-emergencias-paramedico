@@ -2,7 +2,7 @@ import Feather from '@expo/vector-icons/Feather'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { useState } from 'react'
-import { StyleSheet, useColorScheme } from 'react-native'
+import { ScrollView, StyleSheet, useColorScheme, useWindowDimensions } from 'react-native'
 import MapView from 'react-native-maps'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button, Paragraph, Text, XStack, YStack, useTheme, useToastController } from 'tamagui'
@@ -19,12 +19,21 @@ import { useAhora } from '@/shared/reloj/useAhora'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 import { MantenerPresionado } from '@/shared/ui/MantenerPresionado'
 
-import type { Atencion, MotivoCancelacion } from './api'
+import type { Atencion, MotivoCancelacion, MotivoSinTraslado } from './api'
 import { DialogoCancelar } from './DialogoCancelar'
+import { DialogoSinTraslado } from './DialogoSinTraslado'
 import { HitosAtencion } from './HitosAtencion'
 import { MenuAtencion } from './MenuAtencion'
 import { TarjetaDeAtencion } from './TarjetaDeAtencion'
-import { atencionKeys, cancelarAtencionMutation, marcarLlegadaMutation, marcarRecogidaMutation } from './queries'
+import {
+  atencionKeys,
+  cancelarAtencionMutation,
+  cerrarSinTrasladoMutation,
+  liberarMutation,
+  marcarLlegadaAlHospitalMutation,
+  marcarLlegadaMutation,
+  marcarRecogidaMutation,
+} from './queries'
 
 type Props = {
   paramedicoId: number
@@ -38,12 +47,22 @@ const MENSAJES_CANCELACION: Record<MotivoCancelacion, string> = {
   OTRO: 'Tu ambulancia vuelve a estar disponible.',
 }
 
+/** Hasta qué parte del alto de la pantalla crecen los detalles abiertos; lo que no entra se desplaza. */
+const FRACCION_DETALLES = 0.4
+
+/**
+ * A partir de esta distancia al incidente se recuerda cuánto falta antes de marcar la llegada: el hito congela la
+ * ubicación (PB-05 R2) y no se deshace. Es solo un aviso, nunca impide marcarla.
+ */
+const METROS_PARA_AVISAR_LA_DISTANCIA = 200
+
 /**
  * PB-05: la atención en curso. Cada hito congela la hora y la ubicación del momento (R2) y no se deshace, así que se
  * confirma manteniendo presionado. Lo reversible se sigue tocando.
  */
 export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   const margenes = useSafeAreaInsets()
+  const { height: altoPantalla } = useWindowDimensions()
   const esquema = useColorScheme() === 'dark' ? 'dark' : 'light'
   const tema = useTheme()
   const queryClient = useQueryClient()
@@ -54,9 +73,13 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   const [detallesAbiertos, setDetallesAbiertos] = useState(false)
   const [menuAbierto, setMenuAbierto] = useState(false)
   const [cancelando, setCancelando] = useState(false)
+  const [cerrandoSinTraslado, setCerrandoSinTraslado] = useState(false)
 
   const llegada = useMutation(marcarLlegadaMutation(queryClient))
   const recogida = useMutation(marcarRecogidaMutation(queryClient))
+  const llegadaAlHospital = useMutation(marcarLlegadaAlHospitalMutation(queryClient))
+  const sinTraslado = useMutation(cerrarSinTrasladoMutation(queryClient))
+  const liberacion = useMutation(liberarMutation(queryClient))
   const cancelacion = useMutation(cancelarAtencionMutation(queryClient))
 
   const incidente = incidentes.find((abierto) => abierto.id === atencion.incidenteId)
@@ -64,8 +87,11 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
     ...direccionIncidenteQuery(incidente ?? { id: atencion.incidenteId, latitud: 0, longitud: 0 }),
     enabled: incidente !== undefined,
   }).data
-  const distancia = posicion && incidente ? formatearDistancia(distanciaEnMetros(posicion, incidente)) : null
+  const metrosAlLugar = posicion && incidente ? distanciaEnMetros(posicion, incidente) : null
+  const distancia = metrosAlLugar === null ? null : formatearDistancia(metrosAlLugar)
   const lugar = tituloDelLugar(direccion, distancia)
+  const avisoDeDistancia =
+    metrosAlLugar !== null && metrosAlLugar > METROS_PARA_AVISAR_LA_DISTANCIA ? textoDeDistancia(metrosAlLugar) : null
 
   const [regionInicial] = useState(() => {
     const inicio = incidente ?? leerPosicionActual()
@@ -109,6 +135,40 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
       .catch(alFallar('No se pudo marcar la recogida'))
   }
 
+  function marcarLlegadaAlHospital() {
+    const ubicacion = leerPosicionActual()
+    if (!ubicacion) {
+      return
+    }
+    return llegadaAlHospital
+      .mutateAsync({ paramedicoId, atencionId: atencion.id, ubicacion })
+      .catch(alFallar('No se pudo marcar la llegada al hospital'))
+  }
+
+  /** La unidad recien queda libre aca, no al entregar: hasta entonces sigue ocupada en el hospital. */
+  function liberar() {
+    return liberacion
+      .mutateAsync({ paramedicoId, atencionId: atencion.id })
+      .catch(alFallar('No se pudo liberar la unidad'))
+  }
+
+  function cerrarSinTraslado(motivo: MotivoSinTraslado) {
+    const ubicacion = leerPosicionActual()
+    if (!ubicacion) {
+      return
+    }
+    sinTraslado.mutate(
+      { paramedicoId, atencionId: atencion.id, datos: { ...ubicacion, motivo } },
+      {
+        onSuccess: () => setCerrandoSinTraslado(false),
+        onError: (error) => {
+          setCerrandoSinTraslado(false)
+          avisarError('No se pudo terminar la atencion', error)
+        },
+      },
+    )
+  }
+
   function cancelar(motivo: MotivoCancelacion) {
     cancelacion.mutate(
       { paramedicoId, atencionId: atencion.id, motivo },
@@ -127,6 +187,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
 
   const sinPosicion = posicion === null
   const conPaciente = [atencion.nombrePaciente, atencion.documentoPaciente].filter(Boolean).join(' · ')
+  const descripciones = incidente?.descripciones ?? []
 
   return (
     <YStack flex={1} bg="$fondo">
@@ -173,13 +234,35 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
       >
         <YStack self="center" width={40} height={5} rounded={999} bg="$bordeFuerte" />
 
+        {/* Retirar el pedido no corta el viaje: la decisión de seguir o volverse es de la unidad. */}
+        {atencion.emisoresCancelaron && atencion.estado !== 'PACIENTE_ENTREGADO' && atencion.estado !== 'SIN_TRASLADO' ? (
+          <XStack gap={10} px={14} py={12} rounded={14} borderWidth={1} borderColor="$enAtencion" bg="$enAtencionTinte">
+            <Feather name="alert-triangle" size={20} color={tema.enAtencionTexto?.val} />
+            <YStack flex={1} gap={2}>
+              <Text color="$enAtencionTexto" fontSize={15} lineHeight={21} fontWeight="600">
+                Quien avisó dice que ya no necesita la ambulancia
+              </Text>
+              <Paragraph color="$texto" fontSize={14} lineHeight={20}>
+                Vos decidís si seguís o te volvés.
+              </Paragraph>
+            </YStack>
+          </XStack>
+        ) : null}
+
         {atencion.estado === 'EN_CAMINO' ? (
-          <MantenerPresionado
-            texto="Mantén presionado: llegué"
-            apagado={sinPosicion}
-            textoApagado="Esperando tu ubicación para poder marcar la llegada"
-            onCompletar={marcarLlegada}
-          />
+          <>
+            {avisoDeDistancia ? (
+              <Paragraph color="$textoSecundario" fontSize={14} lineHeight={20} text="center">
+                {avisoDeDistancia}
+              </Paragraph>
+            ) : null}
+            <MantenerPresionado
+              texto="Mantén presionado: llegué"
+              apagado={sinPosicion}
+              textoApagado="Esperando tu ubicación para poder marcar la llegada"
+              onCompletar={marcarLlegada}
+            />
+          </>
         ) : null}
 
         {atencion.estado === 'EN_EL_LUGAR' ? (
@@ -195,10 +278,33 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
               accion={conPaciente ? 'Editar' : 'Agregar'}
               onPress={() => router.push('/atencion/paciente')}
             />
+            {/* No trasladar es un desenlace normal, no una cancelación: va a la vista, no escondido en el menú. */}
+            <Button chromeless height={48} onPress={() => setCerrandoSinTraslado(true)}>
+              <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
+                Terminar sin trasladar
+              </Button.Text>
+            </Button>
           </>
         ) : null}
 
         {atencion.estado === 'PACIENTE_RECOGIDO' ? (
+          <>
+            <MantenerPresionado
+              texto="Mantén presionado: llegué al hospital"
+              apagado={sinPosicion}
+              textoApagado="Esperando tu ubicación para poder marcar la llegada"
+              onCompletar={marcarLlegadaAlHospital}
+            />
+            <Tarea
+              texto={conPaciente || 'Falta anotar al paciente'}
+              destacada={!conPaciente}
+              accion={conPaciente ? 'Editar' : 'Agregar'}
+              onPress={() => router.push('/atencion/paciente')}
+            />
+          </>
+        ) : null}
+
+        {atencion.estado === 'EN_HOSPITAL' ? (
           <>
             <BotonPrincipal onPress={() => router.push('/atencion/entrega')}>
               <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
@@ -214,29 +320,65 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
           </>
         ) : null}
 
+        {/* El caso terminó, pero la unidad sigue tomada hasta que se libera: entregar no es quedar libre. */}
+        {atencion.estado === 'PACIENTE_ENTREGADO' || atencion.estado === 'SIN_TRASLADO' ? (
+          <>
+            <Paragraph color="$textoSecundario" fontSize={14} lineHeight={20} text="center">
+              {atencion.estado === 'PACIENTE_ENTREGADO'
+                ? 'Paciente entregado. Tu unidad sigue ocupada hasta que la liberes.'
+                : 'Atención terminada. Tu unidad sigue ocupada hasta que la liberes.'}
+            </Paragraph>
+            <MantenerPresionado texto="Mantén presionado: ya estoy disponible" onCompletar={liberar} />
+          </>
+        ) : null}
+
+        {/* Con varios reportes puede no entrar todo: se desplaza adentro y el paso siguiente sigue a la vista. */}
         {detallesAbiertos ? (
-          <YStack gap={14} px={4} pt={4}>
-            <YStack gap={6}>
+          <ScrollView
+            style={{ maxHeight: altoPantalla * FRACCION_DETALLES }}
+            contentContainerStyle={{ gap: 14, paddingHorizontal: 4, paddingTop: 4 }}
+          >
+            {/* PB-03 R2: todas las descripciones, no solo la primera; pueden haber avisado varias personas. */}
+            <YStack gap={10}>
               <Text color="$texto" fontSize={14} fontWeight="600">
                 Lo que reportaron
               </Text>
-              <Paragraph color="$textoSecundario" fontSize={15} lineHeight={21}>
-                {incidente?.descripciones[0] ?? 'Todavía no dijeron qué pasó.'}
-              </Paragraph>
+              {descripciones.length === 0 ? (
+                <Paragraph color="$textoSecundario" fontSize={15} lineHeight={22}>
+                  Todavía no dijeron qué pasó.
+                </Paragraph>
+              ) : (
+                descripciones.map((descripcion, indice) => (
+                  <Paragraph
+                    key={indice}
+                    color="$texto"
+                    fontSize={15}
+                    lineHeight={22}
+                    px={14}
+                    py={12}
+                    rounded={12}
+                    borderWidth={1}
+                    borderColor="$borde"
+                  >
+                    {descripcion}
+                  </Paragraph>
+                ))
+              )}
             </YStack>
             <HitosAtencion atencion={atencion} />
-          </YStack>
+          </ScrollView>
         ) : null}
 
+        {/* 48 px como mínimo: se tocan con guantes y con el vehículo en movimiento. */}
         <XStack items="center" justify="space-between" gap={10}>
-          <Button chromeless px={4} height={40} onPress={() => setDetallesAbiertos((abierto) => !abierto)}>
+          <Button chromeless px={4} height={48} onPress={() => setDetallesAbiertos((abierto) => !abierto)}>
             <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
               {detallesAbiertos ? 'Ocultar detalles' : 'Ver detalles del incidente'}
             </Button.Text>
           </Button>
           <Button
-            width={40}
-            height={40}
+            width={48}
+            height={48}
             p={0}
             rounded={12}
             bg="$superficie"
@@ -257,8 +399,15 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
         }}
         onCerrar={() => setMenuAbierto(false)}
       />
+      <DialogoSinTraslado
+        abierto={cerrandoSinTraslado}
+        enviando={sinTraslado.isPending}
+        onConfirmar={cerrarSinTraslado}
+        onCerrar={() => setCerrandoSinTraslado(false)}
+      />
       <DialogoCancelar
         abierto={cancelando}
+        estado={atencion.estado}
         enviando={cancelacion.isPending}
         onConfirmar={cancelar}
         onCerrar={() => setCancelando(false)}
@@ -267,7 +416,16 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   )
 }
 
-/** Fila discreta con algo pendiente y opcional, sin robarle sitio al paso siguiente. */
+/** "Estás a 3,2 km del lugar": lo que falta para llegar, dicho igual que en el resto de la pantalla. */
+function textoDeDistancia(metros: number) {
+  const { valor, unidad } = formatearDistancia(metros)
+  return `Estás a ${valor} ${unidad} del lugar`
+}
+
+/**
+ * Fila discreta con algo pendiente y opcional, sin robarle sitio al paso siguiente. El botón ocupa todo el alto de la
+ * fila: 48 px para tocarlo con guantes sin que la fila crezca.
+ */
 function Tarea({
   texto,
   accion,
@@ -280,11 +438,11 @@ function Tarea({
   onPress: () => void
 }) {
   return (
-    <XStack items="center" justify="space-between" gap={10} px={12} py={11} rounded={12} bg="$fondo" borderWidth={1} borderColor="$borde">
+    <XStack items="center" justify="space-between" gap={10} pl={12} rounded={12} bg="$fondo" borderWidth={1} borderColor="$borde">
       <Text color={destacada ? '$texto' : '$textoSecundario'} fontSize={15} fontWeight={destacada ? '600' : '400'} numberOfLines={1} flex={1}>
         {texto}
       </Text>
-      <Button size="$2" chromeless onPress={onPress}>
+      <Button chromeless height={48} px={19} rounded={12} onPress={onPress}>
         <Button.Text color="$primarioPresionado" fontSize={15} fontWeight="600">
           {accion}
         </Button.Text>

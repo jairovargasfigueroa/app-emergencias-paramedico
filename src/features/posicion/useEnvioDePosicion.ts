@@ -1,6 +1,9 @@
 import * as Location from 'expo-location'
 import { useEffect } from 'react'
 
+import { DEMO } from '@/features/demo/bandera'
+import { useSimulador } from '@/features/demo/simulador'
+
 import { coordenadasDe, INTERVALO_ENVIO_MS, registrarPosicion } from './envioDePosicion'
 import { cambiarEstadoUbicacion, useIntentosDeUbicacion } from './estadoUbicacion'
 import { detenerEnvioEnSegundoPlano, iniciarEnvioEnSegundoPlano } from './tareaEnSegundoPlano'
@@ -10,11 +13,22 @@ import { detenerEnvioEnSegundoPlano, iniciarEnvioEnSegundoPlano } from './tareaE
  * Con la app abierta se sigue con `watchPositionAsync`; si hay permiso, una tarea la sigue enviando en segundo plano.
  * El resultado del permiso queda publicado para que la pantalla pueda decirlo en vez de fallar en silencio.
  */
-export function useEnvioDePosicion(paramedicoId: number, enServicio: boolean) {
+export function useEnvioDePosicion(paramedicoId: number, enTurno: boolean) {
   const intento = useIntentosDeUbicacion()
+  const simulador = useSimulador()
+  const enDemostracion = DEMO && simulador.recorrido !== null
+
+  // Demostración: la posición sale del recorrido inventado y entra por el mismo camino que la real, así que el
+  // mapa, los hitos y el envío al servidor no se enteran. Mientras tanto no se toca el GPS del teléfono.
+  useEffect(() => {
+    if (!enDemostracion || !enTurno || !simulador.posicion) {
+      return
+    }
+    void registrarPosicion(paramedicoId, simulador.posicion)
+  }, [enDemostracion, enTurno, paramedicoId, simulador.posicion])
 
   useEffect(() => {
-    if (!enServicio) {
+    if (!enTurno || enDemostracion) {
       void detenerEnvioEnSegundoPlano()
       return
     }
@@ -53,5 +67,5 @@ export function useEnvioDePosicion(paramedicoId: number, enServicio: boolean) {
       suscripcion?.remove()
       void detenerEnvioEnSegundoPlano()
     }
-  }, [paramedicoId, enServicio, intento])
+  }, [paramedicoId, enTurno, intento, enDemostracion])
 }
