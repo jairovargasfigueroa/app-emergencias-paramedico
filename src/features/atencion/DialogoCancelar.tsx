@@ -11,6 +11,8 @@ const MOTIVOS: Record<MotivoCancelacion, { titulo: string; detalle?: string }> =
   AVERIA: { titulo: 'Avería', detalle: 'La ambulancia queda fuera de servicio' },
   NO_SE_ENCONTRO_PACIENTE: { titulo: 'No se encontró al paciente' },
   DESVIADA: { titulo: 'Desviada a otra emergencia' },
+  RECHAZADA_POR_PARAMEDICO: { titulo: 'No puedo tomar este traslado', detalle: 'Se le busca otra unidad' },
+  CANCELADA_POR_SOLICITANTE: { titulo: 'Lo canceló quien lo pidió' },
   OTRO: { titulo: 'Otro motivo' },
 }
 
@@ -31,10 +33,21 @@ const MOTIVOS_POR_ESTADO: Record<EstadoAtencion, MotivoCancelacion[]> = {
   CANCELADA: [],
 }
 
+/**
+ * En un traslado, antes de salir, el paramédico puede devolverlo para que se le busque otra unidad. No aparece
+ * una vez que llegó: a esa altura el pedido se resuelve o se termina sin traslado, no se devuelve.
+ */
+function motivosDisponibles(estado: EstadoAtencion, esTraslado: boolean): MotivoCancelacion[] {
+  const base = MOTIVOS_POR_ESTADO[estado]
+  return esTraslado && estado === 'EN_CAMINO' ? ['RECHAZADA_POR_PARAMEDICO', ...base] : base
+}
+
 type Props = {
   abierto: boolean
   /** Estado de la atención: decide qué motivos se ofrecen. */
   estado: EstadoAtencion
+  /** En un traslado se puede devolver el pedido para que se le busque otra unidad. */
+  esTraslado?: boolean
   enviando: boolean
   onConfirmar: (motivo: MotivoCancelacion) => void
   onCerrar: () => void
@@ -44,7 +57,7 @@ type Props = {
  * PB-05 R5 y CA-13: la cancelación exige un motivo; sin elegirlo no se puede confirmar. Todo llega por props: el
  * contenido se pinta en un portal.
  */
-export function DialogoCancelar({ abierto, estado, enviando, onConfirmar, onCerrar }: Props) {
+export function DialogoCancelar({ abierto, estado, esTraslado = false, enviando, onConfirmar, onCerrar }: Props) {
   const margenes = useSafeAreaInsets()
   const tema = useTheme()
   const [motivo, setMotivo] = useState<MotivoCancelacion | null>(null)
@@ -108,7 +121,7 @@ export function DialogoCancelar({ abierto, estado, enviando, onConfirmar, onCerr
           gap={8}
           aria-label="Motivo de cancelación"
         >
-          {MOTIVOS_POR_ESTADO[estado].map((valor) => {
+          {motivosDisponibles(estado, esTraslado).map((valor) => {
             const opcion = MOTIVOS[valor]
             const elegido = motivo === valor
             const id = `motivo-${valor}`
