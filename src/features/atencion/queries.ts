@@ -9,6 +9,7 @@ import {
   type Entrega,
   type MotivoCancelacion,
   type MotivoSinTraslado,
+  type Movilidad,
   type Ubicacion,
 } from './api'
 
@@ -77,6 +78,24 @@ export const cerrarSinTrasladoMutation = (queryClient: QueryClient) =>
 export const liberarMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: ({ atencionId }: SobreAtencion) => atencionApi.liberar(atencionId),
+    onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
+  })
+
+/** Solo en traslados: llegó y el paciente no estaba listo. Deja la marca; seguir esperando o irse se decide después. */
+export const marcarPacienteNoListoMutation = (queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: ({ atencionId }: SobreAtencion) => atencionApi.marcarPacienteNoListo(atencionId),
+    onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
+  })
+
+/** Solo en traslados: el paciente necesita más de lo que esta unidad puede dar, y el pedido vuelve a la cola. */
+export const unidadNoCorrespondeMutation = (queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: ({
+      atencionId,
+      ...datos
+    }: SobreAtencion & Ubicacion & { movilidad: Movilidad; oxigeno: boolean; equipo: boolean }) =>
+      atencionApi.unidadNoCorresponde(atencionId, datos),
     onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
   })
 

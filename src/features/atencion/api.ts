@@ -9,7 +9,13 @@ export type EstadoAtencion =
   | 'SIN_TRASLADO'
   | 'CANCELADA'
 
-export type MotivoCancelacion = 'AVERIA' | 'NO_SE_ENCONTRO_PACIENTE' | 'DESVIADA' | 'OTRO'
+export type MotivoCancelacion =
+  | 'AVERIA'
+  | 'NO_SE_ENCONTRO_PACIENTE'
+  | 'DESVIADA'
+  | 'RECHAZADA_POR_PARAMEDICO'
+  | 'CANCELADA_POR_SOLICITANTE'
+  | 'OTRO'
 
 /** Cómo terminó una salida que no trasladó a nadie. El motivo decide con qué estado cierra el incidente. */
 export type MotivoSinTraslado =
@@ -18,11 +24,45 @@ export type MotivoSinTraslado =
   | 'NO_HABIA_PACIENTE'
   | 'TRASLADO_POR_OTRO_MEDIO'
   | 'FALLECIDO'
+  | 'PACIENTE_NO_LISTO'
+  | 'UNIDAD_NO_CORRESPONDE'
 
-/** `AtencionResponse` del backend. */
+export type Movilidad = 'CAMINA_CON_AYUDA' | 'SILLA_DE_RUEDAS' | 'CAMILLA'
+
+export type TipoUnidad = 'IA' | 'IB' | 'II' | 'III'
+
+/**
+ * `TrasladoResponse` del backend: todo lo que el paramédico necesita saber antes de salir. Viene dentro de la
+ * atención cuando el trabajo es un traslado y no una emergencia.
+ */
+export type TrasladoDeAtencion = {
+  id: number
+  pasajero: string
+  movilidad: Movilidad
+  oxigeno: boolean
+  equipo: boolean
+  aislamiento: boolean
+  pesoAproximado: number | null
+  acompanantes: number
+  observaciones: string | null
+  tipoUnidad: TipoUnidad
+  origen: Ubicacion
+  origenReferencia: string | null
+  contactoNombre: string | null
+  contactoTelefono: string | null
+  destino: Ubicacion
+  centroSaludDestino: string | null
+  destinoDetalle: string | null
+  horaCita: string | null
+}
+
+/** `AtencionResponse` del backend. Cuelga de un incidente o de un traslado, nunca de los dos. */
 export type Atencion = {
   id: number
-  incidenteId: number
+  /** Nulo cuando la atención es un traslado. */
+  incidenteId: number | null
+  /** Nulo cuando la atención viene de una emergencia. */
+  traslado: TrasladoDeAtencion | null
   ambulanciaId: number
   placa: string
   estado: EstadoAtencion
@@ -35,6 +75,8 @@ export type Atencion = {
   motivoSinTraslado: MotivoSinTraslado | null
   /** Cuándo quedó libre la unidad. Mientras sea `null`, sigue ocupada aunque el paciente ya esté entregado. */
   horaLiberacion: string | null
+  /** Solo en traslados: llegó y el paciente no estaba listo. */
+  horaAvisoNoListo: string | null
   horaCancelacion: string | null
   motivoCancelacion: MotivoCancelacion | null
   nombrePaciente: string | null
@@ -88,5 +130,15 @@ export const atencionApi = {
     api.post<Atencion>(`/atenciones/${atencionId}/cancelar`, { motivo }),
   actualizarPaciente: (atencionId: number, datos: DatosPaciente) =>
     api.post<Atencion>(`/atenciones/${atencionId}/paciente`, datos),
+  /** Solo en traslados: queda la hora de llegada y la espera, que es tiempo de unidad que la empresa paga. */
+  marcarPacienteNoListo: (atencionId: number) => api.post<Atencion>(`/atenciones/${atencionId}/no-listo`),
+  /**
+   * Solo en traslados: el paciente no está como decía la ficha. El paramédico corrige lo que ve y el sistema
+   * vuelve a derivar el tipo de unidad, así el pedido no regresa pidiendo la misma que acaba de fallar.
+   */
+  unidadNoCorresponde: (
+    atencionId: number,
+    datos: Ubicacion & { movilidad: Movilidad; oxigeno: boolean; equipo: boolean },
+  ) => api.post<Atencion>(`/atenciones/${atencionId}/unidad-no-corresponde`, datos),
   centrosSalud: (signal?: AbortSignal) => api.get<CentroSalud[]>('/centros-salud', { signal }),
 }

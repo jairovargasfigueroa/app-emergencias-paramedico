@@ -19,8 +19,10 @@ import { useAhora } from '@/shared/reloj/useAhora'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 import { MantenerPresionado } from '@/shared/ui/MantenerPresionado'
 
-import type { Atencion, MotivoCancelacion, MotivoSinTraslado } from './api'
+import type { Atencion, Movilidad, MotivoCancelacion, MotivoSinTraslado } from './api'
 import { DialogoCancelar } from './DialogoCancelar'
+import { DialogoUnidadNoCorresponde } from './DialogoUnidadNoCorresponde'
+import { PanelDeTraslado } from './PanelDeTraslado'
 import { DialogoSinTraslado } from './DialogoSinTraslado'
 import { HitosAtencion } from './HitosAtencion'
 import { MenuAtencion } from './MenuAtencion'
@@ -32,7 +34,9 @@ import {
   liberarMutation,
   marcarLlegadaAlHospitalMutation,
   marcarLlegadaMutation,
+  marcarPacienteNoListoMutation,
   marcarRecogidaMutation,
+  unidadNoCorrespondeMutation,
 } from './queries'
 
 type Props = {
@@ -44,6 +48,8 @@ const MENSAJES_CANCELACION: Record<MotivoCancelacion, string> = {
   AVERIA: 'Tu ambulancia quedó fuera de servicio.',
   NO_SE_ENCONTRO_PACIENTE: 'Tu ambulancia vuelve a estar disponible.',
   DESVIADA: 'Tu ambulancia vuelve a estar disponible.',
+  RECHAZADA_POR_PARAMEDICO: 'El traslado vuelve a la cola y se le busca otra unidad.',
+  CANCELADA_POR_SOLICITANTE: 'Tu ambulancia vuelve a estar disponible.',
   OTRO: 'Tu ambulancia vuelve a estar disponible.',
 }
 
@@ -74,6 +80,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   const [menuAbierto, setMenuAbierto] = useState(false)
   const [cancelando, setCancelando] = useState(false)
   const [cerrandoSinTraslado, setCerrandoSinTraslado] = useState(false)
+  const [corrigiendoUnidad, setCorrigiendoUnidad] = useState(false)
 
   const llegada = useMutation(marcarLlegadaMutation(queryClient))
   const recogida = useMutation(marcarRecogidaMutation(queryClient))
@@ -81,10 +88,12 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   const sinTraslado = useMutation(cerrarSinTrasladoMutation(queryClient))
   const liberacion = useMutation(liberarMutation(queryClient))
   const cancelacion = useMutation(cancelarAtencionMutation(queryClient))
+  const noListo = useMutation(marcarPacienteNoListoMutation(queryClient))
+  const unidadNoCorresponde = useMutation(unidadNoCorrespondeMutation(queryClient))
 
   const incidente = incidentes.find((abierto) => abierto.id === atencion.incidenteId)
   const direccion = useQuery({
-    ...direccionIncidenteQuery(incidente ?? { id: atencion.incidenteId, latitud: 0, longitud: 0 }),
+    ...direccionIncidenteQuery(incidente ?? { id: atencion.incidenteId ?? 0, latitud: 0, longitud: 0 }),
     enabled: incidente !== undefined,
   }).data
   const metrosAlLugar = posicion && incidente ? distanciaEnMetros(posicion, incidente) : null
@@ -150,6 +159,31 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
     return liberacion
       .mutateAsync({ paramedicoId, atencionId: atencion.id })
       .catch(alFallar('No se pudo liberar la unidad'))
+  }
+
+  /** Solo deja la marca con su hora: si espera o se retira lo decide el paramédico con los otros botones. */
+  function avisarPacienteNoListo() {
+    noListo.mutate(
+      { paramedicoId, atencionId: atencion.id },
+      { onError: (error) => avisarError('No se pudo avisar', error) },
+    )
+  }
+
+  function devolverPorUnidad(datos: { movilidad: Movilidad; oxigeno: boolean; equipo: boolean }) {
+    const ubicacion = leerPosicionActual()
+    if (!ubicacion) {
+      return
+    }
+    unidadNoCorresponde.mutate(
+      { paramedicoId, atencionId: atencion.id, ...ubicacion, ...datos },
+      {
+        onSuccess: () => setCorrigiendoUnidad(false),
+        onError: (error) => {
+          setCorrigiendoUnidad(false)
+          avisarError('No se pudo devolver el traslado', error)
+        },
+      },
+    )
   }
 
   function cerrarSinTraslado(motivo: MotivoSinTraslado) {
@@ -249,6 +283,8 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
           </XStack>
         ) : null}
 
+        {atencion.traslado ? <PanelDeTraslado traslado={atencion.traslado} /> : null}
+
         {atencion.estado === 'EN_CAMINO' ? (
           <>
             {avisoDeDistancia ? (
@@ -278,6 +314,25 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
               accion={conPaciente ? 'Editar' : 'Agregar'}
               onPress={() => router.push('/atencion/paciente')}
             />
+            {atencion.traslado ? (
+              <>
+                <Button
+                  chromeless
+                  height={48}
+                  disabled={noListo.isPending || atencion.horaAvisoNoListo !== null}
+                  onPress={() => avisarPacienteNoListo()}
+                >
+                  <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
+                    {atencion.horaAvisoNoListo ? 'Ya avisaste que no estaba listo' : 'El paciente no está listo'}
+                  </Button.Text>
+                </Button>
+                <Button chromeless height={48} onPress={() => setCorrigiendoUnidad(true)}>
+                  <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
+                    La unidad no corresponde
+                  </Button.Text>
+                </Button>
+              </>
+            ) : null}
             {/* No trasladar es un desenlace normal, no una cancelación: va a la vista, no escondido en el menú. */}
             <Button chromeless height={48} onPress={() => setCerrandoSinTraslado(true)}>
               <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
@@ -405,9 +460,16 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
         onConfirmar={cerrarSinTraslado}
         onCerrar={() => setCerrandoSinTraslado(false)}
       />
+      <DialogoUnidadNoCorresponde
+        abierto={corrigiendoUnidad}
+        enviando={unidadNoCorresponde.isPending}
+        onConfirmar={devolverPorUnidad}
+        onCerrar={() => setCorrigiendoUnidad(false)}
+      />
       <DialogoCancelar
         abierto={cancelando}
         estado={atencion.estado}
+        esTraslado={atencion.traslado !== null}
         enviando={cancelacion.isPending}
         onConfirmar={cancelar}
         onCerrar={() => setCancelando(false)}
