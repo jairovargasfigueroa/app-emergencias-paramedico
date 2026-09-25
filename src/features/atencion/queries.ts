@@ -15,6 +15,7 @@ import {
 
 export const atencionKeys = {
   activa: (paramedicoId: number) => ['atencion', 'activa', paramedicoId] as const,
+  misTraslados: ['atencion', 'mis-traslados'] as const,
   centrosSalud: ['centros-salud'] as const,
 }
 
@@ -31,6 +32,13 @@ export const atencionActivaQuery = (paramedicoId: number) =>
   queryOptions({
     queryKey: atencionKeys.activa(paramedicoId),
     queryFn: async ({ signal }) => (await atencionApi.activa(signal)) ?? null,
+  })
+
+/** Los traslados que hizo este paramédico: su historial. */
+export const misTrasladosQuery = () =>
+  queryOptions({
+    queryKey: atencionKeys.misTraslados,
+    queryFn: ({ signal }) => atencionApi.misTraslados(signal),
   })
 
 /** Catálogo de centros de salud. Puede estar vacío: la entrega nunca se bloquea por eso (PB-05 R4). */
