@@ -100,7 +100,7 @@ function Pantallas() {
       {paramedico.data ? <TareasEnServicio paramedicoId={paramedico.data.id} /> : null}
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Protected guard={identificado}>
-          <Stack.Screen name="index" />
+          <Stack.Screen name="(tabs)" />
           <Stack.Screen name="incidente/[id]" />
           <Stack.Screen name="atencion/entrega" />
           <Stack.Screen name="atencion/paciente" />

@@ -114,6 +114,8 @@ export type Entrega = Ubicacion & {
 export const atencionApi = {
   /** Devuelve `undefined` (204) si la ambulancia del paramédico no tiene una atención activa. */
   activa: (signal?: AbortSignal) => api.get<Atencion | undefined>('/paramedicos/actual/atencion', { signal }),
+  /** Los traslados que hizo este paramédico, del más reciente al más viejo. */
+  misTraslados: (signal?: AbortSignal) => api.get<Atencion[]>('/paramedicos/actual/traslados', { signal }),
   marcarLlegada: (atencionId: number, ubicacion: Ubicacion) =>
     api.post<Atencion>(`/atenciones/${atencionId}/llegada`, ubicacion),
   marcarRecogida: (atencionId: number, datos: Ubicacion & DatosPaciente) =>
