@@ -86,15 +86,24 @@ export async function actualizarTokenDelDispositivo(paramedicoId: number, token:
 
 const respuestasAtendidas = new Set<string>()
 
-/** Al tocar el push, abre el incidente. El backend manda su id en el campo `incidenteId` del mensaje. */
+/**
+ * Al tocar el push, abre lo que el aviso trae: el incidente si vino de una emergencia, o el inicio si vino de un
+ * traslado, porque el traslado asignado se atiende desde ahí igual que cualquier atención en curso.
+ */
 export function abrirIncidenteDeNotificacion(respuesta: NotificationResponse) {
   const identificador = respuesta.notification.request.identifier
   if (respuestasAtendidas.has(identificador)) {
     return
   }
   respuestasAtendidas.add(identificador)
-  const incidenteId = respuesta.notification.request.content.data?.incidenteId
+  const datos = respuesta.notification.request.content.data
+  const incidenteId = datos?.incidenteId
   if (typeof incidenteId === 'string' || typeof incidenteId === 'number') {
     router.push({ pathname: '/incidente/[id]', params: { id: String(incidenteId) } })
+    return
+  }
+  const trasladoId = datos?.trasladoId
+  if (typeof trasladoId === 'string' || typeof trasladoId === 'number') {
+    router.push('/')
   }
 }
