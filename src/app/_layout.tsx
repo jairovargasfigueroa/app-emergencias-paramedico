@@ -102,6 +102,7 @@ function Pantallas() {
         <Stack.Protected guard={identificado}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="incidente/[id]" />
+          <Stack.Screen name="traslado/[atencionId]" />
           <Stack.Screen name="atencion/entrega" />
           <Stack.Screen name="atencion/paciente" />
           <Stack.Screen name="atencion/cierre" />

@@ -87,6 +87,14 @@ export type Atencion = {
   emisoresCancelaron: boolean
 }
 
+/**
+ * Cuándo terminó el trabajo: la entrega, el cierre sin traslado o la cancelación. No la liberación, que es cuándo
+ * la unidad volvió a estar disponible y llega más tarde, después del papeleo y la limpieza. `null` si sigue en curso.
+ */
+export function finDeLaAtencion(atencion: Atencion): string | null {
+  return atencion.horaEntrega ?? atencion.horaSinTraslado ?? atencion.horaCancelacion
+}
+
 /** `CentroSaludResponse` del backend. */
 export type CentroSalud = {
   id: number
