@@ -1,13 +1,8 @@
 import { Linking } from 'react-native'
 import { Button, Paragraph, Text, XStack, YStack } from 'tamagui'
 
-import type { Movilidad, TrasladoDeAtencion } from './api'
-
-const TEXTO_MOVILIDAD: Record<Movilidad, string> = {
-  CAMINA_CON_AYUDA: 'Camina con ayuda',
-  SILLA_DE_RUEDAS: 'Silla de ruedas',
-  CAMILLA: 'Camilla',
-}
+import type { TrasladoDeAtencion } from './api'
+import { TEXTO_MOVILIDAD } from './textos'
 
 /**
  * Lo que distingue a un traslado de una emergencia: se sabe todo antes de salir. A quién recoger, qué necesita,
