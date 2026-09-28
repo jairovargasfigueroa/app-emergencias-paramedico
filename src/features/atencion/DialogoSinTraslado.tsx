@@ -66,7 +66,7 @@ export function DialogoSinTraslado({ abierto, enviando, sinPosicion, onConfirmar
             Terminé sin trasladar
           </H2>
           <Paragraph color="$textoSecundario" fontSize={15} lineHeight={22}>
-            Contá qué pasó en el lugar. Con esto se cierra el incidente.
+            Cuenta qué pasó en el lugar. Con esto se cierra el incidente.
           </Paragraph>
         </YStack>
 

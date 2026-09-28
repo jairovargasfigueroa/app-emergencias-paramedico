@@ -279,7 +279,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
                 Quien avisó dice que ya no necesita la ambulancia
               </Text>
               <Paragraph color="$texto" fontSize={14} lineHeight={20}>
-                Vos decidís si seguís o te volvés.
+                Tú decides si sigues o te vuelves.
               </Paragraph>
             </YStack>
           </XStack>

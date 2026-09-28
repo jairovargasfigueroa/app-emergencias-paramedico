@@ -48,7 +48,7 @@ export function PantallaTrasladoHecho() {
     return (
       <PantallaDeEstado
         titulo="No encontramos ese traslado"
-        descripcion="Puede que ya no esté en tu historial. Volvé a la lista y buscalo de nuevo."
+        descripcion="Puede que ya no esté en tu historial. Vuelve a la lista y búscalo de nuevo."
       >
         <BotonPrincipal onPress={volver}>
           <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
