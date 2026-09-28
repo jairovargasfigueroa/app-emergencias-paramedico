@@ -13,7 +13,7 @@ import {
   type Movilidad,
   type Ubicacion,
 } from './api'
-import { avisarSiSeRetiroElTraslado } from './trasladoRetirado'
+import { avisarSiSeRetiroElTraslado, esTrasladoEnCurso } from './trasladoRetirado'
 
 export const atencionKeys = {
   activa: (paramedicoId: number) => ['atencion', 'activa', paramedicoId] as const,
@@ -104,13 +104,13 @@ export function pasajeroDelTraslado(queryClient: QueryClient, paramedicoId: numb
 }
 
 /**
- * Tras un 409 la atención pudo haber cambiado en otro lado, así que se vuelve a pedir. Devuelve si era un traslado
- * que dejó de ser de la unidad: eso tiene su propio aviso, que dice qué pasó mejor que el error de la acción.
+ * Tras un 409 la atención pudo haber cambiado en otro lado, así que se vuelve a pedir. Devuelve si era un traslado en
+ * curso que dejó de ser de la unidad: eso tiene su propio aviso, que dice qué pasó mejor que el error de la acción.
  */
 export async function reconsultarTrasConflicto(queryClient: QueryClient, paramedicoId: number, atencion: Atencion) {
   await queryClient.invalidateQueries({ queryKey: atencionKeys.activa(paramedicoId) })
   const vigente = queryClient.getQueryData(atencionActivaQuery(paramedicoId).queryKey)
-  return atencion.traslado !== null && vigente !== undefined && vigente?.id !== atencion.id
+  return esTrasladoEnCurso(atencion) && vigente !== undefined && vigente?.id !== atencion.id
 }
 
 type SobreAtencion = {

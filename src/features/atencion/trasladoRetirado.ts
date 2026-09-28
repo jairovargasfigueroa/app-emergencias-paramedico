@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 
-import type { Atencion, EstadoAtencion, MotivoCancelacion } from './api'
+import type { Atencion, EstadoAtencion, MotivoCancelacion, TrasladoDeAtencion } from './api'
 
 /** Por qué la unidad se quedó sin el traslado, cuando lo dice el push. */
 export type MotivoDelRetiro = Extract<MotivoCancelacion, 'CANCELADA_POR_SOLICITANTE' | 'REASIGNADA'>
@@ -14,6 +14,11 @@ export type TrasladoRetirado = {
 
 /** Solo se le saca el traslado a la unidad mientras lo está haciendo: lo ya resuelto no se reasigna. */
 const EN_CURSO: EstadoAtencion[] = ['EN_CAMINO', 'EN_EL_LUGAR', 'PACIENTE_RECOGIDO', 'EN_HOSPITAL']
+
+/** Un traslado que la unidad está haciendo: el único que le pueden sacar. */
+export function esTrasladoEnCurso(atencion: Atencion): atencion is Atencion & { traslado: TrasladoDeAtencion } {
+  return atencion.traslado !== null && EN_CURSO.includes(atencion.estado)
+}
 
 let actual: TrasladoRetirado | null = null
 const oyentes = new Set<() => void>()
@@ -63,7 +68,7 @@ export function avisarSiSeRetiroElTraslado(antes: Atencion | null | undefined, d
   if (despues?.traslado) {
     avisadosConMotivo.delete(despues.traslado.id)
   }
-  if (!antes?.traslado || !EN_CURSO.includes(antes.estado) || despues?.id === antes.id) {
+  if (!antes || !esTrasladoEnCurso(antes) || despues?.id === antes.id) {
     return
   }
   avisarTrasladoRetirado({ trasladoId: antes.traslado.id, pasajero: antes.traslado.pasajero, motivo: null })
