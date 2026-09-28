@@ -107,7 +107,7 @@ function FormularioEntrega({ paramedicoId, atencion }: { paramedicoId: number; a
     { valor: OTRO_DESTINO, titulo: 'Otro destino', detalle: null },
   ]
 
-  /** Como en la atención: tras un 409 se vuelve a consultar, y si el traslado ya no es de la unidad lo dice su aviso. */
+  /** Como en la atención: tras un 409 se vuelve a consultar, y si ya no es de la unidad lo dice su aviso. */
   function avisarError(error: unknown) {
     const mostrar = () => toast.show('No se pudo marcar la entrega', { message: mensajeDeError(error) })
     if (!(error instanceof ErrorApi && error.status === 409)) {
