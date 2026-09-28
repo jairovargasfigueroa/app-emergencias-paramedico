@@ -86,6 +86,13 @@ export function aplicarAtencion(queryClient: QueryClient, paramedicoId: number, 
   }
 }
 
+/** Terminar, liberar o devolver un traslado cambia el historial: se vuelve a pedir para que la lista esté al día. */
+function refrescarMisTraslados(queryClient: QueryClient, atencion: Atencion) {
+  if (atencion.traslado) {
+    void queryClient.invalidateQueries({ queryKey: atencionKeys.misTraslados })
+  }
+}
+
 /** El pasajero de un traslado, si la app lo tiene a mano: el push que avisa que se lo sacaron no lo trae aparte. */
 export function pasajeroDelTraslado(queryClient: QueryClient, paramedicoId: number, trasladoId: number) {
   const activa = queryClient.getQueryData(atencionActivaQuery(paramedicoId).queryKey)
@@ -124,14 +131,20 @@ export const cerrarSinTrasladoMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: ({ atencionId, datos }: SobreAtencion & { datos: Ubicacion & { motivo: MotivoSinTraslado } }) =>
       atencionApi.cerrarSinTraslado(atencionId, datos),
-    onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
+    onSuccess: (atencion, { paramedicoId }) => {
+      aplicarAtencion(queryClient, paramedicoId, atencion)
+      refrescarMisTraslados(queryClient, atencion)
+    },
   })
 
 /** La unidad termina de entregar, limpia y queda libre. Recién acá puede recibir otra emergencia. */
 export const liberarMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: ({ atencionId }: SobreAtencion) => atencionApi.liberar(atencionId),
-    onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
+    onSuccess: (atencion, { paramedicoId }) => {
+      aplicarAtencion(queryClient, paramedicoId, atencion)
+      refrescarMisTraslados(queryClient, atencion)
+    },
   })
 
 /** Solo en traslados: llegó y el paciente no estaba listo. Deja la marca; seguir esperando o irse se decide después. */
@@ -149,7 +162,10 @@ export const unidadNoCorrespondeMutation = (queryClient: QueryClient) =>
       ...datos
     }: SobreAtencion & Ubicacion & { movilidad: Movilidad; oxigeno: boolean; equipo: boolean }) =>
       atencionApi.unidadNoCorresponde(atencionId, datos),
-    onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
+    onSuccess: (atencion, { paramedicoId }) => {
+      aplicarAtencion(queryClient, paramedicoId, atencion)
+      refrescarMisTraslados(queryClient, atencion)
+    },
   })
 
 /** PB-05 CA-01: llegada, con la hora y la ubicación del momento. */
@@ -173,15 +189,24 @@ export const entregarMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: ({ paramedicoId, atencionId, datos }: SobreAtencion & { datos: Entrega }) =>
       atencionApi.entregar(atencionId, datos),
-    onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
+    onSuccess: (atencion, { paramedicoId }) => {
+      aplicarAtencion(queryClient, paramedicoId, atencion)
+      refrescarMisTraslados(queryClient, atencion)
+    },
   })
 
-/** PB-05 R5: cancelación con motivo obligatorio. Con avería, la ambulancia queda fuera de servicio. */
+/**
+ * PB-05 R5: cancelación con motivo obligatorio. Con avería, la ambulancia queda fuera de servicio. En un traslado es
+ * también devolverlo, que es cancelar con su propio motivo.
+ */
 export const cancelarAtencionMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: ({ paramedicoId, atencionId, motivo }: SobreAtencion & { motivo: MotivoCancelacionPropio }) =>
       atencionApi.cancelar(atencionId, motivo),
-    onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
+    onSuccess: (atencion, { paramedicoId }) => {
+      aplicarAtencion(queryClient, paramedicoId, atencion)
+      refrescarMisTraslados(queryClient, atencion)
+    },
   })
 
 /** PB-05 CA-08: los datos del paciente se editan mientras la atención está activa. */
