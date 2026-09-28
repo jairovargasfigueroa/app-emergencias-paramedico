@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { Button, H2, Paragraph, Sheet, Spinner, Text, YStack } from 'tamagui'
+import Feather from '@expo/vector-icons/Feather'
+import { useEffect, useState } from 'react'
+import { Button, H2, Paragraph, Sheet, Spinner, Text, XStack, YStack, useTheme } from 'tamagui'
 
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 
@@ -11,12 +12,18 @@ const MOVILIDADES: { valor: Movilidad; titulo: string; detalle: string }[] = [
   { valor: 'CAMILLA', titulo: 'Camilla', detalle: 'No se levanta, no camina y no puede sentarse' },
 ]
 
+type Ficha = { movilidad: Movilidad; oxigeno: boolean; equipo: boolean }
+
 type Props = {
   abierto: boolean
+  /** Lo que dice la ficha del traslado: de ahí se parte, y se corrige solo lo que no coincide con lo que se ve. */
+  ficha: Ficha
+  /** Por qué el servidor no lo devolvió: con lo marcado, esta misma unidad alcanza para llevarlo. */
+  aviso: string | null
   enviando: boolean
   /** Devolverlo registra dónde estaba la unidad: sin ubicación no se puede confirmar. */
   sinPosicion: boolean
-  onConfirmar: (datos: { movilidad: Movilidad; oxigeno: boolean; equipo: boolean }) => void
+  onConfirmar: (datos: Ficha) => void
   onCerrar: () => void
 }
 
@@ -24,10 +31,20 @@ type Props = {
  * No se elige un tipo de ambulancia: se corrige cómo está el paciente, que es lo que el paramédico tiene delante.
  * De ahí el sistema vuelve a derivar la unidad que hace falta, con la misma regla de siempre.
  */
-export function DialogoUnidadNoCorresponde({ abierto, enviando, sinPosicion, onConfirmar, onCerrar }: Props) {
-  const [movilidad, setMovilidad] = useState<Movilidad>('CAMILLA')
-  const [oxigeno, setOxigeno] = useState(false)
-  const [equipo, setEquipo] = useState(false)
+export function DialogoUnidadNoCorresponde({ abierto, ficha, aviso, enviando, sinPosicion, onConfirmar, onCerrar }: Props) {
+  const tema = useTheme()
+  const [movilidad, setMovilidad] = useState<Movilidad>(ficha.movilidad)
+  const [oxigeno, setOxigeno] = useState(ficha.oxigeno)
+  const [equipo, setEquipo] = useState(ficha.equipo)
+
+  // Cada vez que se abre arranca de la ficha, no de lo que quedó marcado la vez anterior.
+  useEffect(() => {
+    if (abierto) {
+      setMovilidad(ficha.movilidad)
+      setOxigeno(ficha.oxigeno)
+      setEquipo(ficha.equipo)
+    }
+  }, [abierto, ficha.movilidad, ficha.oxigeno, ficha.equipo])
 
   return (
     <Sheet modal open={abierto} onOpenChange={(valor: boolean) => !valor && onCerrar()} snapPointsMode="fit">
@@ -57,6 +74,16 @@ export function DialogoUnidadNoCorresponde({ abierto, enviando, sinPosicion, onC
           elegida={equipo}
           onPress={() => setEquipo(!equipo)}
         />
+
+        {/* Si esta misma unidad alcanza, no hay nada que devolver: se dice acá, para corregir lo marcado o subirlo. */}
+        {aviso ? (
+          <XStack gap={10} px={14} py={12} rounded={14} borderWidth={1} borderColor="$enAtencion" bg="$enAtencionTinte">
+            <Feather name="alert-triangle" size={18} color={tema.enAtencionTexto?.val} />
+            <Paragraph flex={1} color="$texto" fontSize={14} lineHeight={20}>
+              {aviso}
+            </Paragraph>
+          </XStack>
+        ) : null}
 
         {/* Como en los hitos: sin ubicación el botón queda apagado y se dice por qué, en vez de no hacer nada. */}
         {sinPosicion ? (

@@ -223,6 +223,12 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
     )
   }
 
+  /** Cada vez que se abre, sin el aviso de la vez anterior. */
+  function abrirUnidadNoCorresponde() {
+    unidadNoCorresponde.reset()
+    setCorrigiendoUnidad(true)
+  }
+
   function devolverPorUnidad(datos: { movilidad: Movilidad; oxigeno: boolean; equipo: boolean }) {
     const ubicacion = leerPosicionActual()
     if (!ubicacion) {
@@ -233,6 +239,10 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
       {
         onSuccess: () => setCorrigiendoUnidad(false),
         onError: (error) => {
+          // Con lo marcado esta misma unidad alcanza: el diálogo queda abierto y lo dice, para corregir o subirlo.
+          if (esUnidadQueAlcanza(error)) {
+            return
+          }
           setCorrigiendoUnidad(false)
           avisarError('No se pudo devolver el traslado', error)
         },
@@ -420,7 +430,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
                     onRetirarse={() => abrirCierreSinTraslado('PACIENTE_NO_LISTO')}
                   />
                 ) : null}
-                <Button chromeless height={48} onPress={() => setCorrigiendoUnidad(true)}>
+                <Button chromeless height={48} onPress={abrirUnidadNoCorresponde}>
                   <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
                     La unidad no corresponde
                   </Button.Text>
@@ -569,13 +579,17 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
         onConfirmar={cerrarSinTraslado}
         onCerrar={() => setCerrandoSinTraslado(false)}
       />
-      <DialogoUnidadNoCorresponde
-        abierto={corrigiendoUnidad}
-        enviando={unidadNoCorresponde.isPending}
-        sinPosicion={sinPosicion}
-        onConfirmar={devolverPorUnidad}
-        onCerrar={() => setCorrigiendoUnidad(false)}
-      />
+      {atencion.traslado ? (
+        <DialogoUnidadNoCorresponde
+          abierto={corrigiendoUnidad}
+          ficha={atencion.traslado}
+          aviso={esUnidadQueAlcanza(unidadNoCorresponde.error) ? mensajeDeError(unidadNoCorresponde.error) : null}
+          enviando={unidadNoCorresponde.isPending}
+          sinPosicion={sinPosicion}
+          onConfirmar={devolverPorUnidad}
+          onCerrar={() => setCorrigiendoUnidad(false)}
+        />
+      ) : null}
       <DialogoCancelar
         abierto={cancelando}
         estado={atencion.estado}
@@ -592,6 +606,11 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
       />
     </YStack>
   )
+}
+
+/** El 409 de "la unidad no corresponde" cuando, con lo que se marcó, esta misma unidad alcanza para llevarlo. */
+function esUnidadQueAlcanza(error: unknown) {
+  return error instanceof ErrorApi && error.codigo === 'UNIDAD_ALCANZA'
 }
 
 /**
