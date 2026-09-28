@@ -12,6 +12,7 @@ import {
   type Movilidad,
   type Ubicacion,
 } from './api'
+import { avisarSiSeRetiroElTraslado } from './trasladoRetirado'
 
 export const atencionKeys = {
   activa: (paramedicoId: number) => ['atencion', 'activa', paramedicoId] as const,
@@ -27,11 +28,20 @@ function ocupaLaUnidad(atencion: Atencion) {
   return atencion.estado !== 'CANCELADA' && atencion.horaLiberacion === null
 }
 
-/** Atención activa de la ambulancia del paramédico, o `null` si no tiene. */
+/**
+ * Atención activa de la ambulancia del paramédico, o `null` si no tiene. Cada consulta se compara con lo que la app
+ * mostraba: si el traslado en curso ya no está, se lo sacaron a la unidad y hay que decírselo.
+ */
 export const atencionActivaQuery = (paramedicoId: number) =>
   queryOptions({
     queryKey: atencionKeys.activa(paramedicoId),
-    queryFn: async ({ signal }) => (await atencionApi.activa(signal)) ?? null,
+    queryFn: async ({ client, queryKey, signal }) => {
+      const activa = (await atencionApi.activa(signal)) ?? null
+      // Contra lo que había al volver la respuesta, no al pedirla: si en el medio la tripulación cerró el traslado
+      // desde la app, eso ya está guardado y no hay nada que avisar.
+      avisarSiSeRetiroElTraslado(client.getQueryData<Atencion | null>(queryKey), activa)
+      return activa
+    },
   })
 
 /** Los traslados que hizo este paramédico: su historial. */
@@ -59,6 +69,26 @@ export function aplicarAtencion(queryClient: QueryClient, paramedicoId: number, 
   if (!ocupada) {
     void queryClient.invalidateQueries({ queryKey: servicioKeys.actual(paramedicoId) })
   }
+}
+
+/** El pasajero de un traslado, si la app lo tiene a mano: el push que avisa que se lo sacaron no lo trae aparte. */
+export function pasajeroDelTraslado(queryClient: QueryClient, paramedicoId: number, trasladoId: number) {
+  const activa = queryClient.getQueryData(atencionActivaQuery(paramedicoId).queryKey)
+  if (activa?.traslado?.id === trasladoId) {
+    return activa.traslado.pasajero
+  }
+  const hechos = queryClient.getQueryData(misTrasladosQuery().queryKey)
+  return hechos?.find((atencion) => atencion.traslado?.id === trasladoId)?.traslado?.pasajero ?? null
+}
+
+/**
+ * Tras un 409 la atención pudo haber cambiado en otro lado, así que se vuelve a pedir. Devuelve si era un traslado
+ * que dejó de ser de la unidad: eso tiene su propio aviso, que dice qué pasó mejor que el error de la acción.
+ */
+export async function reconsultarTrasConflicto(queryClient: QueryClient, paramedicoId: number, atencion: Atencion) {
+  await queryClient.invalidateQueries({ queryKey: atencionKeys.activa(paramedicoId) })
+  const vigente = queryClient.getQueryData(atencionActivaQuery(paramedicoId).queryKey)
+  return atencion.traslado !== null && vigente !== undefined && vigente?.id !== atencion.id
 }
 
 type SobreAtencion = {

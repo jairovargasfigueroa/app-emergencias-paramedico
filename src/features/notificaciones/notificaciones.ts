@@ -3,9 +3,11 @@ import { router } from 'expo-router'
 import type { DevicePushToken, Notification, NotificationResponse } from 'expo-notifications'
 import { Platform } from 'react-native'
 
-import { atencionKeys } from '@/features/atencion/queries'
+import { atencionKeys, pasajeroDelTraslado } from '@/features/atencion/queries'
+import { avisarTrasladoRetirado, type MotivoDelRetiro } from '@/features/atencion/trasladoRetirado'
 import { servicioApi } from '@/features/servicio/api'
 import { servicioKeys } from '@/features/servicio/queries'
+import { irAInicio } from '@/shared/navegacion/inicio'
 import { queryClient } from '@/shared/query/queryClient'
 
 /** Canal de Android para los incidentes nuevos. app.json lo declara como canal por defecto de FCM. */
@@ -87,15 +89,33 @@ export async function actualizarTokenDelDispositivo(paramedicoId: number, token:
   }
 }
 
+/** Lo que el backend pone en `tipo` cuando le saca el traslado a la unidad. */
+function motivoDelRetiro(tipo: unknown): MotivoDelRetiro | null {
+  switch (tipo) {
+    case 'TRASLADO_CANCELADO':
+      return 'CANCELADA_POR_SOLICITANTE'
+    case 'TRASLADO_REASIGNADO':
+      return 'REASIGNADA'
+    default:
+      return null
+  }
+}
+
 /**
  * Un push de traslado dice que la atención de la unidad cambió en el servidor: le asignaron un traslado o se lo
- * sacaron. Se vuelve a pedir en el acto, para que el cambio se vea sin salir de la app y volver a entrar. Devuelve si
- * el push era de un traslado.
+ * sacaron. Se vuelve a pedir en el acto, para que el cambio se vea sin salir de la app y volver a entrar, y si se lo
+ * sacaron se avisa por qué. Devuelve si el push era de un traslado.
  */
 function actualizarPorTraslado(datos: Record<string, unknown> | undefined, paramedicoId: number) {
   const trasladoId = datos?.trasladoId
   if (typeof trasladoId !== 'string' && typeof trasladoId !== 'number') {
     return false
+  }
+  const motivo = motivoDelRetiro(datos?.tipo)
+  if (motivo) {
+    const id = Number(trasladoId)
+    // Antes de volver a pedir la atención: después ya no está en la caché, y con ella se va el nombre del pasajero.
+    avisarTrasladoRetirado({ trasladoId: id, motivo, pasajero: pasajeroDelTraslado(queryClient, paramedicoId, id) })
   }
   void queryClient.invalidateQueries({ queryKey: atencionKeys.activa(paramedicoId) })
   void queryClient.invalidateQueries({ queryKey: atencionKeys.misTraslados })
@@ -113,9 +133,10 @@ const respuestasAtendidas = new Set<string>()
 
 /**
  * Al tocar el push, abre lo que el aviso trae: el incidente si vino de una emergencia, o el inicio si vino de un
- * traslado, porque el traslado asignado se atiende desde ahí igual que cualquier atención en curso.
+ * traslado, porque el traslado asignado se atiende desde ahí igual que cualquier atención en curso. Si se lo
+ * sacaron, ahí mismo se ve el aviso de por qué.
  */
-export function abrirIncidenteDeNotificacion(respuesta: NotificationResponse) {
+export function abrirIncidenteDeNotificacion(respuesta: NotificationResponse, paramedicoId: number) {
   const identificador = respuesta.notification.request.identifier
   if (respuestasAtendidas.has(identificador)) {
     return
@@ -127,8 +148,7 @@ export function abrirIncidenteDeNotificacion(respuesta: NotificationResponse) {
     router.push({ pathname: '/incidente/[id]', params: { id: String(incidenteId) } })
     return
   }
-  const trasladoId = datos?.trasladoId
-  if (typeof trasladoId === 'string' || typeof trasladoId === 'number') {
-    router.push('/')
+  if (actualizarPorTraslado(datos, paramedicoId)) {
+    irAInicio()
   }
 }

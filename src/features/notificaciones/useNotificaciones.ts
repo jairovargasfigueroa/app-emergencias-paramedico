@@ -26,7 +26,7 @@ export function useNotificaciones(paramedicoId: number) {
 
       const ultimaRespuesta = Notifications.getLastNotificationResponse()
       if (ultimaRespuesta && ultimaRespuesta.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
-        abrirIncidenteDeNotificacion(ultimaRespuesta)
+        abrirIncidenteDeNotificacion(ultimaRespuesta, paramedicoId)
       }
 
       suscripciones.push(
@@ -35,7 +35,7 @@ export function useNotificaciones(paramedicoId: number) {
         }),
         Notifications.addNotificationResponseReceivedListener((respuesta) => {
           if (respuesta.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
-            abrirIncidenteDeNotificacion(respuesta)
+            abrirIncidenteDeNotificacion(respuesta, paramedicoId)
           }
         }),
         Notifications.addPushTokenListener((token) => {

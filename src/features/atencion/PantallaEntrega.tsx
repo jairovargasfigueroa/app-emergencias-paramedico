@@ -21,12 +21,12 @@ import {
 
 import { leerPosicionActual, usePosicionActual } from '@/features/posicion/posicionActual'
 import { paramedicoGuardadoQuery } from '@/features/servicio/queries'
-import { mensajeDeError } from '@/shared/api/cliente'
+import { ErrorApi, mensajeDeError } from '@/shared/api/cliente'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 import { MantenerPresionado } from '@/shared/ui/MantenerPresionado'
 import { PantallaDeEstado } from '@/shared/ui/PantallaDeEstado'
 
-import { atencionActivaQuery, centrosSaludQuery, entregarMutation } from './queries'
+import { atencionActivaQuery, centrosSaludQuery, entregarMutation, reconsultarTrasConflicto } from './queries'
 
 const OTRO_DESTINO = 'otro'
 const LARGO_MAXIMO_DESCRIPCION = 2000
@@ -76,8 +76,23 @@ export function PantallaEntrega() {
     )
   }
 
-  const atencionId = atencion.data.id
+  const actual = atencion.data
+  const atencionId = actual.id
   const paramedicoId = paramedico.id
+
+  /** Como en la atención: tras un 409 se vuelve a consultar, y si el traslado ya no es de la unidad lo dice su aviso. */
+  function avisarError(error: unknown) {
+    const mostrar = () => toast.show('No se pudo marcar la entrega', { message: mensajeDeError(error) })
+    if (!(error instanceof ErrorApi && error.status === 409)) {
+      mostrar()
+      return
+    }
+    void reconsultarTrasConflicto(queryClient, paramedicoId, actual).then((retirado) => {
+      if (!retirado) {
+        mostrar()
+      }
+    })
+  }
 
   function marcarEntrega() {
     const ubicacion = leerPosicionActual()
@@ -108,7 +123,7 @@ export function PantallaEntrega() {
         })
       })
       .catch((error: unknown) => {
-        toast.show('No se pudo marcar la entrega', { message: mensajeDeError(error) })
+        avisarError(error)
         // Se vuelve a lanzar para que el control se desbloquee y pueda reintentarse.
         throw error
       })

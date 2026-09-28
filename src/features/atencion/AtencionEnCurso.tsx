@@ -34,7 +34,6 @@ import { HitosAtencion } from './HitosAtencion'
 import { MenuAtencion } from './MenuAtencion'
 import { TarjetaDeAtencion } from './TarjetaDeAtencion'
 import {
-  atencionKeys,
   cancelarAtencionMutation,
   cerrarSinTrasladoMutation,
   liberarMutation,
@@ -42,6 +41,7 @@ import {
   marcarLlegadaMutation,
   marcarPacienteNoListoMutation,
   marcarRecogidaMutation,
+  reconsultarTrasConflicto,
   unidadNoCorrespondeMutation,
 } from './queries'
 
@@ -116,11 +116,17 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   })
 
   function avisarError(titulo: string, error: unknown) {
-    toast.show(titulo, { message: mensajeDeError(error) })
-    // Si la atención cambió en otro lado (transición inválida o ya finalizada), se vuelve a consultar.
-    if (error instanceof ErrorApi && error.status === 409) {
-      void queryClient.invalidateQueries({ queryKey: atencionKeys.activa(paramedicoId) })
+    if (!(error instanceof ErrorApi && error.status === 409)) {
+      toast.show(titulo, { message: mensajeDeError(error) })
+      return
     }
+    // La atención cambió en otro lado (transición inválida o ya finalizada): se vuelve a consultar. Si era un traslado
+    // y se lo sacaron a la unidad, su aviso dice qué pasó y el error de la acción sobra.
+    void reconsultarTrasConflicto(queryClient, paramedicoId, atencion).then((retirado) => {
+      if (!retirado) {
+        toast.show(titulo, { message: mensajeDeError(error) })
+      }
+    })
   }
 
   /** Si la petición falla, se vuelve a lanzar para que el control se desbloquee y pueda reintentarse. */
