@@ -6,11 +6,13 @@ import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 
 import type { MotivoSinTraslado } from './api'
 
+type Opcion = { valor: MotivoSinTraslado; titulo: string; detalle: string }
+
 /**
  * Cómo terminó la salida. El motivo no es solo para el registro: decide con qué estado cierra el incidente, por eso
  * se dice debajo de cada opción qué va a pasar.
  */
-const MOTIVOS: { valor: MotivoSinTraslado; titulo: string; detalle: string }[] = [
+const MOTIVOS_EMERGENCIA: Opcion[] = [
   { valor: 'ATENDIDO_EN_EL_LUGAR', titulo: 'Lo atendí acá', detalle: 'No hizo falta trasladarlo' },
   { valor: 'PACIENTE_RECHAZO', titulo: 'No quiso ir', detalle: 'El paciente rechaza el traslado' },
   { valor: 'NO_HABIA_PACIENTE', titulo: 'No había nadie', detalle: 'El incidente queda como falsa alarma' },
@@ -18,8 +20,32 @@ const MOTIVOS: { valor: MotivoSinTraslado; titulo: string; detalle: string }[] =
   { valor: 'FALLECIDO', titulo: 'Falleció en el lugar', detalle: 'Sin traslado' },
 ]
 
+/**
+ * En un traslado nadie espera que se lo atienda en la puerta: se va a buscar a alguien para llevarlo. Cualquiera de
+ * estos motivos deja el traslado como no realizado; debajo se dice qué se encontró.
+ */
+const MOTIVOS_TRASLADO: Opcion[] = [
+  { valor: 'PACIENTE_RECHAZO', titulo: 'No quiso viajar', detalle: 'El paciente rechaza el traslado' },
+  { valor: 'NO_HABIA_PACIENTE', titulo: 'No había nadie', detalle: 'Nadie respondió en el origen' },
+  { valor: 'TRASLADO_POR_OTRO_MEDIO', titulo: 'Ya se fue por otro medio', detalle: 'Viajó por su cuenta antes de que llegaras' },
+  { valor: 'FALLECIDO', titulo: 'Falleció', detalle: 'Sin traslado' },
+]
+
+/** Solo después de la espera: primero se avisa que no estaba listo y se le da la tolerancia. */
+const NO_ESTABA_LISTO: Opcion = {
+  valor: 'PACIENTE_NO_LISTO',
+  titulo: 'No estaba listo',
+  detalle: 'Pasó la espera y todavía no podía salir',
+}
+
 type Props = {
   abierto: boolean
+  /** En un traslado se ofrecen sus propios motivos y se dicen con sus palabras. */
+  esTraslado: boolean
+  /** Solo en traslados: hasta cuándo se espera a un paciente que no estaba listo. Cumplida, se puede cerrar por eso. */
+  esperaHasta: string | null
+  /** El motivo que ya viene elegido, cuando se abre desde un botón que lo dice. */
+  motivoInicial: MotivoSinTraslado | null
   enviando: boolean
   /** El cierre registra dónde terminó la atención: sin ubicación no se puede confirmar. */
   sinPosicion: boolean
@@ -28,15 +54,33 @@ type Props = {
 }
 
 /** No es una cancelación: la unidad fue, resolvió y lo reporta. Por eso tiene sus propios motivos. */
-export function DialogoSinTraslado({ abierto, enviando, sinPosicion, onConfirmar, onCerrar }: Props) {
+export function DialogoSinTraslado({
+  abierto,
+  esTraslado,
+  esperaHasta,
+  motivoInicial,
+  enviando,
+  sinPosicion,
+  onConfirmar,
+  onCerrar,
+}: Props) {
   const margenes = useSafeAreaInsets()
   const [motivo, setMotivo] = useState<MotivoSinTraslado | null>(null)
 
   useEffect(() => {
     if (abierto) {
-      setMotivo(null)
+      setMotivo(motivoInicial)
     }
-  }, [abierto])
+  }, [abierto, motivoInicial])
+
+  // Se mira al abrir. Si la espera se cumple con el diálogo abierto, la opción aparece al volver a abrirlo; para irse
+  // apenas se cumple está el botón de la espera, que sí lleva la cuenta.
+  const esperaCumplida = esperaHasta !== null && Date.now() >= new Date(esperaHasta).getTime()
+  const motivos = esTraslado
+    ? esperaCumplida
+      ? [NO_ESTABA_LISTO, ...MOTIVOS_TRASLADO]
+      : MOTIVOS_TRASLADO
+    : MOTIVOS_EMERGENCIA
 
   return (
     <Sheet
@@ -66,7 +110,9 @@ export function DialogoSinTraslado({ abierto, enviando, sinPosicion, onConfirmar
             Terminé sin trasladar
           </H2>
           <Paragraph color="$textoSecundario" fontSize={15} lineHeight={22}>
-            Cuenta qué pasó en el lugar. Con esto se cierra el incidente.
+            {esTraslado
+              ? 'Cuenta qué pasó en el origen. El traslado queda como no realizado.'
+              : 'Cuenta qué pasó en el lugar. Con esto se cierra el incidente.'}
           </Paragraph>
         </YStack>
 
@@ -74,9 +120,9 @@ export function DialogoSinTraslado({ abierto, enviando, sinPosicion, onConfirmar
           value={motivo ?? ''}
           onValueChange={(valor) => setMotivo(valor as MotivoSinTraslado)}
           gap={8}
-          aria-label="Qué pasó en el lugar"
+          aria-label={esTraslado ? 'Qué pasó en el origen' : 'Qué pasó en el lugar'}
         >
-          {MOTIVOS.map(({ valor, titulo, detalle }) => {
+          {motivos.map(({ valor, titulo, detalle }) => {
             const elegido = motivo === valor
             const id = `sin-traslado-${valor}`
             return (

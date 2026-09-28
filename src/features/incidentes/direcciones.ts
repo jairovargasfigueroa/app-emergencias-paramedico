@@ -23,13 +23,20 @@ export async function direccionAproximada(latitud: number, longitud: number): Pr
   return primera ? formatearDireccion(primera) : null
 }
 
-/** El título de una emergencia es el lugar. Sin dirección, a qué distancia queda; nunca los afectados. */
-export function tituloDelLugar(direccion: string | null | undefined, distancia: Distancia | null): string {
+/**
+ * El título de una emergencia es el lugar. Sin dirección, a qué distancia queda; nunca los afectados. Sin ninguna de
+ * las dos se dice qué es: una emergencia, salvo que se pida otra cosa, como el origen de un traslado.
+ */
+export function tituloDelLugar(
+  direccion: string | null | undefined,
+  distancia: Distancia | null,
+  sinDatos = 'Emergencia abierta',
+): string {
   if (direccion) {
     return direccion
   }
   if (distancia) {
     return `A ${distancia.valor} ${distancia.unidad} de ti`
   }
-  return 'Emergencia abierta'
+  return sinDatos
 }

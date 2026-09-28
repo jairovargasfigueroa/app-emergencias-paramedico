@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
+import { useFocusEffect } from 'expo-router'
+import { useCallback, useRef } from 'react'
 import { ScrollView } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { H1, Paragraph, Spinner, Text, XStack, YStack } from 'tamagui'
@@ -10,6 +12,20 @@ import { TarjetaDeTraslado } from './TarjetaDeTraslado'
 export function PantallaMisTraslados() {
   const margenes = useSafeAreaInsets()
   const traslados = useQuery(misTrasladosQuery())
+  const { refetch } = traslados
+
+  // La pestaña sigue montada cuando se va a otra: al volver se pide de nuevo, para ver el último traslado. La primera
+  // vez no hace falta, recién la pidió la consulta al montarse.
+  const primeraVez = useRef(true)
+  useFocusEffect(
+    useCallback(() => {
+      if (primeraVez.current) {
+        primeraVez.current = false
+        return
+      }
+      void refetch()
+    }, [refetch]),
+  )
 
   return (
     <ScrollView

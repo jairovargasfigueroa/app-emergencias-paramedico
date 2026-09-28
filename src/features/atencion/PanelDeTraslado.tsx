@@ -1,8 +1,23 @@
 import { Linking } from 'react-native'
 import { Button, Paragraph, Text, XStack, YStack } from 'tamagui'
 
+import { horaCorta } from '@/shared/formato/tiempo'
+
 import type { TrasladoDeAtencion } from './api'
-import { TEXTO_MOVILIDAD } from './textos'
+import { TEXTO_MOVILIDAD, TEXTO_TIPO_UNIDAD } from './textos'
+
+/**
+ * Para cuándo es y cuándo hay que pasar a buscarlo: "Cita 10:00 · Recoger entre 09:10 y 09:30". La ventana es lo que
+ * se le prometió a la familia; si cae en un mismo minuto, va una sola hora.
+ */
+function horasDelTraslado(traslado: TrasladoDeAtencion) {
+  const cuando =
+    traslado.modoHorario === 'INMEDIATO' ? 'Para ahora' : traslado.horaCita ? `Cita ${horaCorta(traslado.horaCita)}` : null
+  const desde = traslado.horaRecogidaDesde ? horaCorta(traslado.horaRecogidaDesde) : null
+  const hasta = traslado.horaRecogidaHasta ? horaCorta(traslado.horaRecogidaHasta) : null
+  const recoger = desde && hasta ? (desde === hasta ? `Recoger a las ${desde}` : `Recoger entre ${desde} y ${hasta}`) : null
+  return [cuando, recoger].filter(Boolean).join(' · ')
+}
 
 /**
  * Lo que distingue a un traslado de una emergencia: se sabe todo antes de salir. A quién recoger, qué necesita,
@@ -14,6 +29,7 @@ export function PanelDeTraslado({ traslado }: { traslado: TrasladoDeAtencion }) 
     traslado.equipo ? 'vía o sonda' : null,
     traslado.aislamiento ? 'aislamiento' : null,
   ].filter((texto): texto is string => texto !== null)
+  const horas = horasDelTraslado(traslado)
 
   return (
     <YStack gap={10} p={14} rounded={14} bg="$superficie" borderWidth={1} borderColor="$borde">
@@ -21,12 +37,17 @@ export function PanelDeTraslado({ traslado }: { traslado: TrasladoDeAtencion }) 
         <Text fontSize={16} fontWeight="600" color="$texto" flex={1} numberOfLines={1}>
           {traslado.pasajero}
         </Text>
-        {traslado.horaCita ? (
-          <Text fontSize={13} fontFamily="$mono" color="$textoSecundario">
-            {new Date(traslado.horaCita).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-        ) : null}
+        {/* La unidad que hace falta: si no es la que se tiene, se ve antes de salir. */}
+        <Text fontSize={13} fontFamily="$mono" color="$textoSecundario">
+          {TEXTO_TIPO_UNIDAD[traslado.tipoUnidad]}
+        </Text>
       </XStack>
+
+      {horas ? (
+        <Text fontSize={14} fontWeight="500" color="$texto">
+          {horas}
+        </Text>
+      ) : null}
 
       <Text fontSize={14} color="$texto">
         {TEXTO_MOVILIDAD[traslado.movilidad]}

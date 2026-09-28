@@ -1,7 +1,7 @@
 import Feather from '@expo/vector-icons/Feather'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { router } from 'expo-router'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ScrollView, StyleSheet, useColorScheme, useWindowDimensions } from 'react-native'
 import MapView from 'react-native-maps'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -19,23 +19,35 @@ import { useAhora } from '@/shared/reloj/useAhora'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 import { MantenerPresionado } from '@/shared/ui/MantenerPresionado'
 
-import { incidenteDeLaAtencion, type Atencion, type Movilidad, type MotivoCancelacion, type MotivoSinTraslado } from './api'
+import {
+  incidenteDeLaAtencion,
+  lugarDelTraslado,
+  puntoDelTraslado,
+  type Atencion,
+  type Movilidad,
+  type MotivoCancelacionPropio,
+  type MotivoSinTraslado,
+} from './api'
 import { DialogoCancelar } from './DialogoCancelar'
+import { DialogoDevolverTraslado } from './DialogoDevolverTraslado'
 import { DialogoUnidadNoCorresponde } from './DialogoUnidadNoCorresponde'
+import { EsperaDelPaciente } from './EsperaDelPaciente'
+import { MarcadorDeTraslado } from './MarcadorDeTraslado'
 import { PanelDeTraslado } from './PanelDeTraslado'
 import { DialogoSinTraslado } from './DialogoSinTraslado'
 import { HitosAtencion } from './HitosAtencion'
 import { MenuAtencion } from './MenuAtencion'
 import { TarjetaDeAtencion } from './TarjetaDeAtencion'
 import {
-  atencionKeys,
   cancelarAtencionMutation,
   cerrarSinTrasladoMutation,
+  direccionDelPuntoQuery,
   liberarMutation,
   marcarLlegadaAlHospitalMutation,
   marcarLlegadaMutation,
   marcarPacienteNoListoMutation,
   marcarRecogidaMutation,
+  reconsultarTrasConflicto,
   unidadNoCorrespondeMutation,
 } from './queries'
 
@@ -44,12 +56,11 @@ type Props = {
   atencion: Atencion
 }
 
-const MENSAJES_CANCELACION: Record<MotivoCancelacion, string> = {
+const MENSAJES_CANCELACION: Record<MotivoCancelacionPropio, string> = {
   AVERIA: 'Tu ambulancia quedó fuera de servicio.',
   NO_SE_ENCONTRO_PACIENTE: 'Tu ambulancia vuelve a estar disponible.',
   DESVIADA: 'Tu ambulancia vuelve a estar disponible.',
   RECHAZADA_POR_PARAMEDICO: 'El traslado vuelve a la cola y se le busca otra unidad.',
-  CANCELADA_POR_SOLICITANTE: 'Tu ambulancia vuelve a estar disponible.',
   OTRO: 'Tu ambulancia vuelve a estar disponible.',
 }
 
@@ -57,8 +68,8 @@ const MENSAJES_CANCELACION: Record<MotivoCancelacion, string> = {
 const FRACCION_DETALLES = 0.4
 
 /**
- * A partir de esta distancia al incidente se recuerda cuánto falta antes de marcar la llegada: el hito congela la
- * ubicación (PB-05 R2) y no se deshace. Es solo un aviso, nunca impide marcarla.
+ * A partir de esta distancia al incidente, o al origen de un traslado, se recuerda cuánto falta antes de marcar la
+ * llegada: el hito congela la ubicación (PB-05 R2) y no se deshace. Es solo un aviso, nunca impide marcarla.
  */
 const METROS_PARA_AVISAR_LA_DISTANCIA = 200
 
@@ -79,7 +90,10 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   const [detallesAbiertos, setDetallesAbiertos] = useState(false)
   const [menuAbierto, setMenuAbierto] = useState(false)
   const [cancelando, setCancelando] = useState(false)
+  const [devolviendo, setDevolviendo] = useState(false)
   const [cerrandoSinTraslado, setCerrandoSinTraslado] = useState(false)
+  // El motivo con que se abre el cierre sin traslado cuando lo abre un botón que ya lo dice, como retirarse tras la espera.
+  const [motivoSugerido, setMotivoSugerido] = useState<MotivoSinTraslado | null>(null)
   const [corrigiendoUnidad, setCorrigiendoUnidad] = useState(false)
 
   const llegada = useMutation(marcarLlegadaMutation(queryClient))
@@ -95,27 +109,61 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   // liberación ya no está ahí. Mientras tanto se usan los datos que llegaron con la atención.
   const enVivo = incidentes.find((abierto) => abierto.id === atencion.incidenteId)
   const incidente = enVivo ?? incidenteDeLaAtencion(atencion)
-  const direccion = useQuery({
+  const direccionIncidente = useQuery({
     ...direccionIncidenteQuery(incidente ?? { id: atencion.incidenteId ?? 0, latitud: 0, longitud: 0 }),
     enabled: incidente !== undefined,
   }).data
-  const metrosAlLugar = posicion && incidente ? distanciaEnMetros(posicion, incidente) : null
+  // En un traslado no hay incidente: se va al origen hasta subir al paciente y al destino desde ahí. Un destino que es
+  // un centro de salud ya tiene nombre, así que no hace falta buscarle la dirección.
+  const punto = puntoDelTraslado(atencion)
+  const conNombre = punto?.tipo === 'destino' && atencion.traslado?.centroSaludDestino != null
+  const direccionDelPunto = useQuery({
+    ...direccionDelPuntoQuery(punto?.ubicacion ?? { latitud: 0, longitud: 0 }),
+    enabled: punto !== null && !conNombre,
+  }).data
+  const haciaDonde = incidente ?? punto?.ubicacion
+  const metrosAlLugar = posicion && haciaDonde ? distanciaEnMetros(posicion, haciaDonde) : null
   const distancia = metrosAlLugar === null ? null : formatearDistancia(metrosAlLugar)
-  const lugar = tituloDelLugar(direccion, distancia)
+  const delTraslado = atencion.traslado && punto ? lugarDelTraslado(atencion.traslado, punto.tipo, direccionDelPunto) : null
+  const lugar = punto
+    ? tituloDelLugar(delTraslado?.nombre, distancia, punto.tipo === 'origen' ? 'Origen del traslado' : 'Destino del traslado')
+    : tituloDelLugar(direccionIncidente, distancia)
   const avisoDeDistancia =
-    metrosAlLugar !== null && metrosAlLugar > METROS_PARA_AVISAR_LA_DISTANCIA ? textoDeDistancia(metrosAlLugar) : null
+    metrosAlLugar !== null && metrosAlLugar > METROS_PARA_AVISAR_LA_DISTANCIA
+      ? textoDeDistancia(metrosAlLugar, punto ? punto.tipo : 'lugar')
+      : null
 
+  const mapa = useRef<MapView>(null)
   const [regionInicial] = useState(() => {
-    const inicio = incidente ?? leerPosicionActual()
+    const inicio = incidente ?? punto?.ubicacion ?? leerPosicionActual()
     return regionAlrededorDe(inicio ?? CENTRO_POR_DEFECTO, inicio ? DELTA_BARRIO : DELTA_CIUDAD)
   })
 
-  function avisarError(titulo: string, error: unknown) {
-    toast.show(titulo, { message: mensajeDeError(error) })
-    // Si la atención cambió en otro lado (transición inválida o ya finalizada), se vuelve a consultar.
-    if (error instanceof ErrorApi && error.status === 409) {
-      void queryClient.invalidateQueries({ queryKey: atencionKeys.activa(paramedicoId) })
+  // Al subir al paciente el marcador pasa del origen al destino, que puede quedar fuera de la vista: se lleva la
+  // cámara hasta allá.
+  const tipoDePunto = punto?.tipo
+  const ubicacionDelPunto = punto?.ubicacion
+  const tipoMostrado = useRef(tipoDePunto)
+  useEffect(() => {
+    if (!ubicacionDelPunto || tipoDePunto === tipoMostrado.current) {
+      return
     }
+    tipoMostrado.current = tipoDePunto
+    mapa.current?.animateToRegion(regionAlrededorDe(ubicacionDelPunto, DELTA_BARRIO), 600)
+  }, [tipoDePunto, ubicacionDelPunto])
+
+  function avisarError(titulo: string, error: unknown) {
+    if (!(error instanceof ErrorApi && error.status === 409)) {
+      toast.show(titulo, { message: mensajeDeError(error) })
+      return
+    }
+    // La atención cambió en otro lado (transición inválida o ya finalizada): se vuelve a consultar. Si era un traslado
+    // y se lo sacaron a la unidad, su aviso dice qué pasó y el error de la acción sobra.
+    void reconsultarTrasConflicto(queryClient, paramedicoId, atencion).then((retirado) => {
+      if (!retirado) {
+        toast.show(titulo, { message: mensajeDeError(error) })
+      }
+    })
   }
 
   /** Si la petición falla, se vuelve a lanzar para que el control se desbloquee y pueda reintentarse. */
@@ -164,12 +212,21 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
       .catch(alFallar('No se pudo liberar la unidad'))
   }
 
-  /** Solo deja la marca con su hora: si espera o se retira lo decide el paramédico con los otros botones. */
+  /**
+   * Deja la marca con su hora y el servidor arranca la espera. Hasta que se cumple, la unidad no se puede retirar
+   * por eso; subir al paciente se puede siempre.
+   */
   function avisarPacienteNoListo() {
     noListo.mutate(
       { paramedicoId, atencionId: atencion.id },
       { onError: (error) => avisarError('No se pudo avisar', error) },
     )
+  }
+
+  /** Cada vez que se abre, sin el aviso de la vez anterior. */
+  function abrirUnidadNoCorresponde() {
+    unidadNoCorresponde.reset()
+    setCorrigiendoUnidad(true)
   }
 
   function devolverPorUnidad(datos: { movilidad: Movilidad; oxigeno: boolean; equipo: boolean }) {
@@ -182,11 +239,20 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
       {
         onSuccess: () => setCorrigiendoUnidad(false),
         onError: (error) => {
+          // Con lo marcado esta misma unidad alcanza: el diálogo queda abierto y lo dice, para corregir o subirlo.
+          if (esUnidadQueAlcanza(error)) {
+            return
+          }
           setCorrigiendoUnidad(false)
           avisarError('No se pudo devolver el traslado', error)
         },
       },
     )
+  }
+
+  function abrirCierreSinTraslado(motivo: MotivoSinTraslado | null) {
+    setMotivoSugerido(motivo)
+    setCerrandoSinTraslado(true)
   }
 
   function cerrarSinTraslado(motivo: MotivoSinTraslado) {
@@ -206,7 +272,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
     )
   }
 
-  function cancelar(motivo: MotivoCancelacion) {
+  function cancelar(motivo: MotivoCancelacionPropio) {
     cancelacion.mutate(
       { paramedicoId, atencionId: atencion.id, motivo },
       {
@@ -222,15 +288,35 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
     )
   }
 
+  /** La tripulación no puede hacer el traslado que le asignaron: vuelve a la cola y se le busca otra unidad. */
+  function devolver() {
+    cancelacion.mutate(
+      { paramedicoId, atencionId: atencion.id, motivo: 'RECHAZADA_POR_PARAMEDICO' },
+      {
+        onSuccess: () => {
+          setDevolviendo(false)
+          toast.show('Traslado devuelto', { message: MENSAJES_CANCELACION.RECHAZADA_POR_PARAMEDICO })
+        },
+        onError: (error) => {
+          setDevolviendo(false)
+          avisarError('No se pudo devolver el traslado', error)
+        },
+      },
+    )
+  }
+
   const sinPosicion = posicion === null
   // Entregada o terminada sin traslado ya no hay nada que cancelar (ME-1): solo queda liberar la unidad.
   const sePuedeCancelar = atencion.estado !== 'PACIENTE_ENTREGADO' && atencion.estado !== 'SIN_TRASLADO'
   const conPaciente = [atencion.nombrePaciente, atencion.documentoPaciente].filter(Boolean).join(' · ')
+  // En un traslado se sabe quién viaja desde antes de salir: no hay paciente que anotar.
+  const seAnotaPaciente = atencion.traslado === null
   const descripciones = incidente?.descripciones ?? []
 
   return (
     <YStack flex={1} bg="$fondo">
       <MapView
+        ref={mapa}
         style={StyleSheet.absoluteFill}
         initialRegion={regionInicial}
         showsUserLocation
@@ -241,12 +327,14 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
         userInterfaceStyle={esquema}
       >
         {incidente ? <MarcadorIncidente incidente={incidente} destacado /> : null}
+        {punto ? <MarcadorDeTraslado key={punto.tipo} punto={punto} /> : null}
       </MapView>
 
       <YStack position="absolute" t={margenes.top + 12} l={16} r={16}>
         <TarjetaDeAtencion
           atencion={atencion}
           lugar={lugar}
+          referencia={delTraslado?.referencia ?? null}
           distancia={distancia}
           unidadesAcudiendo={enVivo?.unidadesAcudiendo ?? 1}
           ahora={ahora}
@@ -298,11 +386,20 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
               </Paragraph>
             ) : null}
             <MantenerPresionado
-              texto="Mantén presionado: llegué"
+              texto={atencion.traslado ? 'Mantén presionado: llegué al origen' : 'Mantén presionado: llegué'}
               apagado={sinPosicion}
               textoApagado="Esperando tu ubicación para poder marcar la llegada"
               onCompletar={marcarLlegada}
             />
+            {/* Devolver no es cancelar: la central asignó el traslado y la tripulación dice que no puede hacerlo. Va a
+                la vista, como terminar sin trasladar, y solo mientras la unidad no llegó al origen. */}
+            {atencion.traslado ? (
+              <Button chromeless height={48} onPress={() => setDevolviendo(true)}>
+                <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
+                  Devolver el traslado
+                </Button.Text>
+              </Button>
+            ) : null}
           </>
         ) : null}
 
@@ -314,24 +411,30 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
               textoApagado="Esperando tu ubicación para poder marcar la recogida"
               onCompletar={marcarRecogida}
             />
-            <Tarea
-              texto={conPaciente || 'Datos del paciente · opcional'}
-              accion={conPaciente ? 'Editar' : 'Agregar'}
-              onPress={() => router.push('/atencion/paciente')}
-            />
+            {seAnotaPaciente ? (
+              <Tarea
+                texto={conPaciente || 'Datos del paciente · opcional'}
+                accion={conPaciente ? 'Editar' : 'Agregar'}
+                onPress={() => router.push('/atencion/paciente')}
+              />
+            ) : null}
             {atencion.traslado ? (
               <>
-                <Button
-                  chromeless
-                  height={48}
-                  disabled={noListo.isPending || atencion.horaAvisoNoListo !== null}
-                  onPress={() => avisarPacienteNoListo()}
-                >
-                  <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
-                    {atencion.horaAvisoNoListo ? 'Ya avisaste que no estaba listo' : 'El paciente no está listo'}
-                  </Button.Text>
-                </Button>
-                <Button chromeless height={48} onPress={() => setCorrigiendoUnidad(true)}>
+                {/* Avisado que no estaba listo, el botón deja lugar a la espera en curso, que dice hasta cuándo. */}
+                {atencion.horaAvisoNoListo === null ? (
+                  <Button chromeless height={48} disabled={noListo.isPending} onPress={() => avisarPacienteNoListo()}>
+                    <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
+                      El paciente no está listo
+                    </Button.Text>
+                  </Button>
+                ) : null}
+                {atencion.esperaHasta ? (
+                  <EsperaDelPaciente
+                    esperaHasta={atencion.esperaHasta}
+                    onRetirarse={() => abrirCierreSinTraslado('PACIENTE_NO_LISTO')}
+                  />
+                ) : null}
+                <Button chromeless height={48} onPress={abrirUnidadNoCorresponde}>
                   <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
                     La unidad no corresponde
                   </Button.Text>
@@ -339,7 +442,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
               </>
             ) : null}
             {/* No trasladar es un desenlace normal, no una cancelación: va a la vista, no escondido en el menú. */}
-            <Button chromeless height={48} onPress={() => setCerrandoSinTraslado(true)}>
+            <Button chromeless height={48} onPress={() => abrirCierreSinTraslado(null)}>
               <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
                 Terminar sin trasladar
               </Button.Text>
@@ -355,12 +458,14 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
               textoApagado="Esperando tu ubicación para poder marcar la llegada"
               onCompletar={marcarLlegadaAlHospital}
             />
-            <Tarea
-              texto={conPaciente || 'Falta anotar al paciente'}
-              destacada={!conPaciente}
-              accion={conPaciente ? 'Editar' : 'Agregar'}
-              onPress={() => router.push('/atencion/paciente')}
-            />
+            {seAnotaPaciente ? (
+              <Tarea
+                texto={conPaciente || 'Falta anotar al paciente'}
+                destacada={!conPaciente}
+                accion={conPaciente ? 'Editar' : 'Agregar'}
+                onPress={() => router.push('/atencion/paciente')}
+              />
+            ) : null}
           </>
         ) : null}
 
@@ -371,12 +476,14 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
                 Entregar al paciente
               </Button.Text>
             </BotonPrincipal>
-            <Tarea
-              texto={conPaciente || 'Falta anotar al paciente'}
-              destacada={!conPaciente}
-              accion={conPaciente ? 'Editar' : 'Agregar'}
-              onPress={() => router.push('/atencion/paciente')}
-            />
+            {seAnotaPaciente ? (
+              <Tarea
+                texto={conPaciente || 'Falta anotar al paciente'}
+                destacada={!conPaciente}
+                accion={conPaciente ? 'Editar' : 'Agregar'}
+                onPress={() => router.push('/atencion/paciente')}
+              />
+            ) : null}
           </>
         ) : null}
 
@@ -398,33 +505,36 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
             style={{ maxHeight: altoPantalla * FRACCION_DETALLES }}
             contentContainerStyle={{ gap: 14, paddingHorizontal: 4, paddingTop: 4 }}
           >
-            {/* PB-03 R2: todas las descripciones, no solo la primera; pueden haber avisado varias personas. */}
-            <YStack gap={10}>
-              <Text color="$texto" fontSize={14} fontWeight="600">
-                Lo que reportaron
-              </Text>
-              {descripciones.length === 0 ? (
-                <Paragraph color="$textoSecundario" fontSize={15} lineHeight={22}>
-                  Todavía no dijeron qué pasó.
-                </Paragraph>
-              ) : (
-                descripciones.map((descripcion, indice) => (
-                  <Paragraph
-                    key={indice}
-                    color="$texto"
-                    fontSize={15}
-                    lineHeight={22}
-                    px={14}
-                    py={12}
-                    rounded={12}
-                    borderWidth={1}
-                    borderColor="$borde"
-                  >
-                    {descripcion}
+            {/* PB-03 R2: todas las descripciones, no solo la primera; pueden haber avisado varias personas. Un
+                traslado no tiene reportes: lo que se sabe de él ya está en su panel. */}
+            {atencion.traslado ? null : (
+              <YStack gap={10}>
+                <Text color="$texto" fontSize={14} fontWeight="600">
+                  Lo que reportaron
+                </Text>
+                {descripciones.length === 0 ? (
+                  <Paragraph color="$textoSecundario" fontSize={15} lineHeight={22}>
+                    Todavía no dijeron qué pasó.
                   </Paragraph>
-                ))
-              )}
-            </YStack>
+                ) : (
+                  descripciones.map((descripcion, indice) => (
+                    <Paragraph
+                      key={indice}
+                      color="$texto"
+                      fontSize={15}
+                      lineHeight={22}
+                      px={14}
+                      py={12}
+                      rounded={12}
+                      borderWidth={1}
+                      borderColor="$borde"
+                    >
+                      {descripcion}
+                    </Paragraph>
+                  ))
+                )}
+              </YStack>
+            )}
             <HitosAtencion atencion={atencion} />
           </ScrollView>
         ) : null}
@@ -433,7 +543,11 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
         <XStack items="center" justify="space-between" gap={10}>
           <Button chromeless px={4} height={48} onPress={() => setDetallesAbiertos((abierto) => !abierto)}>
             <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
-              {detallesAbiertos ? 'Ocultar detalles' : 'Ver detalles del incidente'}
+              {detallesAbiertos
+                ? 'Ocultar detalles'
+                : atencion.traslado
+                  ? 'Ver detalles del traslado'
+                  : 'Ver detalles del incidente'}
             </Button.Text>
           </Button>
           {/* Cancelar es lo único que trae el menú: si no se puede cancelar, no hay menú que abrir. */}
@@ -456,6 +570,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
 
       <MenuAtencion
         abierto={menuAbierto}
+        esTraslado={atencion.traslado !== null}
         onCancelarAtencion={() => {
           setMenuAbierto(false)
           setCancelando(true)
@@ -464,18 +579,25 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
       />
       <DialogoSinTraslado
         abierto={cerrandoSinTraslado}
+        esTraslado={atencion.traslado !== null}
+        esperaHasta={atencion.esperaHasta}
+        motivoInicial={motivoSugerido}
         enviando={sinTraslado.isPending}
         sinPosicion={sinPosicion}
         onConfirmar={cerrarSinTraslado}
         onCerrar={() => setCerrandoSinTraslado(false)}
       />
-      <DialogoUnidadNoCorresponde
-        abierto={corrigiendoUnidad}
-        enviando={unidadNoCorresponde.isPending}
-        sinPosicion={sinPosicion}
-        onConfirmar={devolverPorUnidad}
-        onCerrar={() => setCorrigiendoUnidad(false)}
-      />
+      {atencion.traslado ? (
+        <DialogoUnidadNoCorresponde
+          abierto={corrigiendoUnidad}
+          ficha={atencion.traslado}
+          aviso={esUnidadQueAlcanza(unidadNoCorresponde.error) ? mensajeDeError(unidadNoCorresponde.error) : null}
+          enviando={unidadNoCorresponde.isPending}
+          sinPosicion={sinPosicion}
+          onConfirmar={devolverPorUnidad}
+          onCerrar={() => setCorrigiendoUnidad(false)}
+        />
+      ) : null}
       <DialogoCancelar
         abierto={cancelando}
         estado={atencion.estado}
@@ -484,14 +606,28 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
         onConfirmar={cancelar}
         onCerrar={() => setCancelando(false)}
       />
+      <DialogoDevolverTraslado
+        abierto={devolviendo}
+        enviando={cancelacion.isPending}
+        onConfirmar={devolver}
+        onCerrar={() => setDevolviendo(false)}
+      />
     </YStack>
   )
 }
 
-/** "Estás a 3,2 km del lugar": lo que falta para llegar, dicho igual que en el resto de la pantalla. */
-function textoDeDistancia(metros: number) {
+/** El 409 de "la unidad no corresponde" cuando, con lo que se marcó, esta misma unidad alcanza para llevarlo. */
+function esUnidadQueAlcanza(error: unknown) {
+  return error instanceof ErrorApi && error.codigo === 'UNIDAD_ALCANZA'
+}
+
+/**
+ * "Estás a 3,2 km del lugar", o "del origen" en un traslado: lo que falta para llegar, dicho igual que en el resto de
+ * la pantalla.
+ */
+function textoDeDistancia(metros: number, adonde: 'lugar' | 'origen' | 'destino') {
   const { valor, unidad } = formatearDistancia(metros)
-  return `Estás a ${valor} ${unidad} del lugar`
+  return `Estás a ${valor} ${unidad} del ${adonde}`
 }
 
 /**

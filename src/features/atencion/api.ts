@@ -15,7 +15,15 @@ export type MotivoCancelacion =
   | 'DESVIADA'
   | 'RECHAZADA_POR_PARAMEDICO'
   | 'CANCELADA_POR_SOLICITANTE'
+  /** Solo en traslados: la unidad no llegaba y la central se lo pasó a otra. */
+  | 'REASIGNADA'
   | 'OTRO'
+
+/**
+ * Los motivos que elige la tripulación al cancelar. Los otros dos no son suyos: quien pidió el traslado lo retira, o
+ * la central se lo pasa a otra unidad.
+ */
+export type MotivoCancelacionPropio = Exclude<MotivoCancelacion, 'CANCELADA_POR_SOLICITANTE' | 'REASIGNADA'>
 
 /** Cómo terminó una salida que no trasladó a nadie. El motivo decide con qué estado cierra el incidente. */
 export type MotivoSinTraslado =
@@ -31,12 +39,36 @@ export type Movilidad = 'CAMINA_CON_AYUDA' | 'SILLA_DE_RUEDAS' | 'CAMILLA'
 
 export type TipoUnidad = 'IA' | 'IB' | 'II' | 'III'
 
+export type EstadoTraslado =
+  | 'PROGRAMADO'
+  | 'BUSCANDO_UNIDAD'
+  | 'ASIGNADO'
+  | 'COMPLETADO'
+  | 'NO_REALIZADO'
+  | 'NO_CUBIERTO'
+  | 'CANCELADO'
+
+/** Para ahora, o para una cita a una hora conocida. */
+export type ModoHorario = 'INMEDIATO' | 'PROGRAMADO'
+
 /**
  * `TrasladoResponse` del backend: todo lo que el paramédico necesita saber antes de salir. Viene dentro de la
  * atención cuando el trabajo es un traslado y no una emergencia.
  */
 export type TrasladoDeAtencion = {
   id: number
+  estado: EstadoTraslado
+  /** En qué va la unidad que lo tiene. Dentro de la atención llega siempre nulo: lo dice el estado de la atención. */
+  estadoUnidad: EstadoAtencion | null
+  modoHorario: ModoHorario
+  /** A qué hora tiene que estar en el destino. Nula si es para ahora. */
+  horaCita: string | null
+  horaSalidaEstimada: string
+  /** Última salida posible para llegar a tiempo. */
+  horaLimiteSalida: string
+  /** La ventana que se le prometió a la familia: cuándo pasa la unidad por el origen. */
+  horaRecogidaDesde: string | null
+  horaRecogidaHasta: string | null
   pasajero: string
   movilidad: Movilidad
   oxigeno: boolean
@@ -45,15 +77,19 @@ export type TrasladoDeAtencion = {
   pesoAproximado: number | null
   acompanantes: number
   observaciones: string | null
+  /** El que hace falta de verdad: mayor que el pedido si una tripulación corrigió la ficha. */
   tipoUnidad: TipoUnidad
+  tipoUnidadPedido: TipoUnidad
   origen: Ubicacion
   origenReferencia: string | null
   contactoNombre: string | null
   contactoTelefono: string | null
   destino: Ubicacion
+  /** El centro del catálogo, si el destino es uno: la entrega lo trae ya elegido. */
+  centroSaludDestinoId: number | null
   centroSaludDestino: string | null
   destinoDetalle: string | null
-  horaCita: string | null
+  fechaHoraCreacion: string
 }
 
 /** `AtencionResponse` del backend. Cuelga de un incidente o de un traslado, nunca de los dos. */
@@ -82,6 +118,8 @@ export type Atencion = {
   horaLiberacion: string | null
   /** Solo en traslados: llegó y el paciente no estaba listo. */
   horaAvisoNoListo: string | null
+  /** Solo en traslados: hasta cuándo espera la tripulación a ese paciente. Antes no se puede retirar por eso. */
+  esperaHasta: string | null
   horaCancelacion: string | null
   motivoCancelacion: MotivoCancelacion | null
   nombrePaciente: string | null
@@ -116,6 +154,47 @@ export function incidenteDeLaAtencion(atencion: Atencion) {
     cantidadAfectados: atencion.incidente.cantidadAfectados ?? undefined,
     descripciones: atencion.incidente.descripciones,
   }
+}
+
+/** El punto del traslado al que va la unidad. */
+export type PuntoDelTraslado = {
+  tipo: 'origen' | 'destino'
+  ubicacion: Ubicacion
+}
+
+/**
+ * Hacia dónde va la unidad en un traslado: al origen hasta subir al paciente y al destino desde ahí. Nulo en una
+ * emergencia, que tiene su incidente.
+ */
+export function puntoDelTraslado(atencion: Atencion): PuntoDelTraslado | null {
+  const traslado = atencion.traslado
+  if (!traslado) {
+    return null
+  }
+  return atencion.horaRecogida === null
+    ? { tipo: 'origen', ubicacion: traslado.origen }
+    : { tipo: 'destino', ubicacion: traslado.destino }
+}
+
+/**
+ * El punto del traslado en palabras: cómo se llama y qué más ayuda a encontrarlo. El destino se nombra por su centro
+ * de salud, si es uno; el origen, por la dirección que resuelve el teléfono. La referencia que dejó quien lo pidió
+ * va aparte, o de nombre si no hay nada mejor.
+ */
+export function lugarDelTraslado(
+  traslado: TrasladoDeAtencion,
+  tipo: PuntoDelTraslado['tipo'],
+  direccion: string | null | undefined,
+): { nombre: string | null; referencia: string | null } {
+  if (tipo === 'destino') {
+    const nombre = traslado.centroSaludDestino ?? direccion ?? null
+    return nombre
+      ? { nombre, referencia: traslado.destinoDetalle }
+      : { nombre: traslado.destinoDetalle, referencia: null }
+  }
+  return direccion
+    ? { nombre: direccion, referencia: traslado.origenReferencia }
+    : { nombre: traslado.origenReferencia, referencia: null }
 }
 
 /**
@@ -167,7 +246,7 @@ export const atencionApi = {
     api.post<Atencion>(`/atenciones/${atencionId}/sin-traslado`, datos),
   /** La unidad queda libre. Hasta acá sigue ocupada, aunque el paciente ya esté entregado. */
   liberar: (atencionId: number) => api.post<Atencion>(`/atenciones/${atencionId}/liberacion`),
-  cancelar: (atencionId: number, motivo: MotivoCancelacion) =>
+  cancelar: (atencionId: number, motivo: MotivoCancelacionPropio) =>
     api.post<Atencion>(`/atenciones/${atencionId}/cancelar`, { motivo }),
   actualizarPaciente: (atencionId: number, datos: DatosPaciente) =>
     api.post<Atencion>(`/atenciones/${atencionId}/paciente`, datos),
