@@ -48,6 +48,11 @@ export function descartarTrasladoRetirado() {
   publicar(null)
 }
 
+/** Si el aviso a la vista es el de ese traslado: un push que llega después todavía puede decir por qué fue. */
+export function seEstaAvisandoElRetiro(trasladoId: number) {
+  return actual?.trasladoId === trasladoId
+}
+
 /**
  * Compara la atención que la app mostraba con la que acaba de devolver el servidor. Si el traslado que la unidad
  * estaba haciendo ya no está, lo cerró alguien más: quien lo pidió o la central. Lo que cierra la tripulación desde

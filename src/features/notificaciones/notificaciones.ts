@@ -3,8 +3,12 @@ import { router } from 'expo-router'
 import type { DevicePushToken, Notification, NotificationResponse } from 'expo-notifications'
 import { Platform } from 'react-native'
 
-import { atencionKeys, pasajeroDelTraslado } from '@/features/atencion/queries'
-import { avisarTrasladoRetirado, type MotivoDelRetiro } from '@/features/atencion/trasladoRetirado'
+import { atencionActivaQuery, atencionKeys, pasajeroDelTraslado } from '@/features/atencion/queries'
+import {
+  avisarTrasladoRetirado,
+  seEstaAvisandoElRetiro,
+  type MotivoDelRetiro,
+} from '@/features/atencion/trasladoRetirado'
 import { servicioApi } from '@/features/servicio/api'
 import { servicioKeys } from '@/features/servicio/queries'
 import { irAInicio } from '@/shared/navegacion/inicio'
@@ -115,7 +119,12 @@ function actualizarPorTraslado(datos: Record<string, unknown> | undefined, param
   if (motivo) {
     const id = Number(trasladoId)
     // Antes de volver a pedir la atención: después ya no está en la caché, y con ella se va el nombre del pasajero.
-    avisarTrasladoRetirado({ trasladoId: id, motivo, pasajero: pasajeroDelTraslado(queryClient, paramedicoId, id) })
+    const activa = queryClient.getQueryData(atencionActivaQuery(paramedicoId).queryKey)
+    // Se avisa si era el traslado que la app mostraba, o si todavía no sabe nada porque se abrió con el toque. Un
+    // push que llega tarde, con la unidad ya en otra cosa, diría que quedó libre cuando no es así.
+    if (activa === undefined || activa?.traslado?.id === id || seEstaAvisandoElRetiro(id)) {
+      avisarTrasladoRetirado({ trasladoId: id, motivo, pasajero: pasajeroDelTraslado(queryClient, paramedicoId, id) })
+    }
   }
   void queryClient.invalidateQueries({ queryKey: atencionKeys.activa(paramedicoId) })
   void queryClient.invalidateQueries({ queryKey: atencionKeys.misTraslados })
