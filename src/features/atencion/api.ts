@@ -61,6 +61,11 @@ export type Atencion = {
   id: number
   /** Nulo cuando la atención es un traslado. */
   incidenteId: number | null
+  /**
+   * Dónde es y qué se sabe del incidente. Llega también cuando el incidente ya se cerró y Firebase lo retiró, que es
+   * el rato entre entregar y liberarse. Nulo en traslados.
+   */
+  incidente: DatosDelIncidente | null
   /** Nulo cuando la atención viene de una emergencia. */
   traslado: TrasladoDeAtencion | null
   ambulanciaId: number
@@ -85,6 +90,32 @@ export type Atencion = {
   destinoDescripcion: string | null
   /** Todos los que pidieron esta ambulancia retiraron su pedido: hay que decidir si seguir o volverse. */
   emisoresCancelaron: boolean
+}
+
+/** `AtencionResponse.DatosDelIncidente` del backend: dónde es y qué se sabe del incidente. */
+export type DatosDelIncidente = {
+  latitud: number
+  longitud: number
+  fechaHoraCreacion: string
+  cantidadAfectados: number | null
+  descripciones: string[]
+}
+
+/**
+ * El incidente de la atención tal como lo mandó el backend, con la forma que usan el mapa y la dirección. Es el
+ * respaldo cuando Firebase no lo tiene: todavía no llegó, o ya lo retiró porque el incidente se cerró.
+ */
+export function incidenteDeLaAtencion(atencion: Atencion) {
+  if (atencion.incidenteId === null || !atencion.incidente) {
+    return undefined
+  }
+  return {
+    id: atencion.incidenteId,
+    latitud: atencion.incidente.latitud,
+    longitud: atencion.incidente.longitud,
+    cantidadAfectados: atencion.incidente.cantidadAfectados ?? undefined,
+    descripciones: atencion.incidente.descripciones,
+  }
 }
 
 /**

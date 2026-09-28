@@ -19,7 +19,7 @@ import { useAhora } from '@/shared/reloj/useAhora'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 import { MantenerPresionado } from '@/shared/ui/MantenerPresionado'
 
-import type { Atencion, Movilidad, MotivoCancelacion, MotivoSinTraslado } from './api'
+import { incidenteDeLaAtencion, type Atencion, type Movilidad, type MotivoCancelacion, type MotivoSinTraslado } from './api'
 import { DialogoCancelar } from './DialogoCancelar'
 import { DialogoUnidadNoCorresponde } from './DialogoUnidadNoCorresponde'
 import { PanelDeTraslado } from './PanelDeTraslado'
@@ -91,7 +91,10 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   const noListo = useMutation(marcarPacienteNoListoMutation(queryClient))
   const unidadNoCorresponde = useMutation(unidadNoCorrespondeMutation(queryClient))
 
-  const incidente = incidentes.find((abierto) => abierto.id === atencion.incidenteId)
+  // Firebase trae el incidente al día mientras está abierto, pero lo retira al cerrarse: entre la entrega y la
+  // liberación ya no está ahí. Mientras tanto se usan los datos que llegaron con la atención.
+  const enVivo = incidentes.find((abierto) => abierto.id === atencion.incidenteId)
+  const incidente = enVivo ?? incidenteDeLaAtencion(atencion)
   const direccion = useQuery({
     ...direccionIncidenteQuery(incidente ?? { id: atencion.incidenteId ?? 0, latitud: 0, longitud: 0 }),
     enabled: incidente !== undefined,
@@ -245,7 +248,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
           atencion={atencion}
           lugar={lugar}
           distancia={distancia}
-          unidadesAcudiendo={incidente?.unidadesAcudiendo ?? 1}
+          unidadesAcudiendo={enVivo?.unidadesAcudiendo ?? 1}
           ahora={ahora}
         />
       </YStack>

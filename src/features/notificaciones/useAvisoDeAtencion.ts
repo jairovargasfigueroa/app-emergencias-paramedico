@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
-import type { EstadoAtencion } from '@/features/atencion/api'
+import { incidenteDeLaAtencion, type EstadoAtencion } from '@/features/atencion/api'
 import { atencionActivaQuery } from '@/features/atencion/queries'
 import { useIncidentesAbiertos } from '@/features/incidentes/incidentesAbiertos'
 import { direccionIncidenteQuery } from '@/features/incidentes/queries'
@@ -35,7 +35,10 @@ export function useAvisoDeAtencion(paramedicoId: number, enTurno: boolean) {
   const atencion = useQuery({ ...atencionActivaQuery(paramedicoId), enabled: enTurno }).data
   const { incidentes } = useIncidentesAbiertos()
 
-  const incidente = atencion ? incidentes.find((abierto) => abierto.id === atencion.incidenteId) : undefined
+  // Si Firebase todavía no lo trajo, o ya lo retiró, la dirección sale de los datos que llegaron con la atención.
+  const incidente = atencion
+    ? (incidentes.find((abierto) => abierto.id === atencion.incidenteId) ?? incidenteDeLaAtencion(atencion))
+    : undefined
   const direccion = useQuery({
     // Con el incidente todavía sin llegar, comparte clave con la pantalla: si ya la resolvió, sale de la caché.
     ...direccionIncidenteQuery(incidente ?? { id: atencion?.incidenteId ?? 0, latitud: 0, longitud: 0 }),
