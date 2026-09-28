@@ -8,7 +8,7 @@ import {
   avisarTrasladoRetirado,
   seEstaAvisandoElRetiro,
   type MotivoDelRetiro,
-} from '@/features/atencion/trasladoRetirado'
+} from '@/features/atencion/atencionRetirada'
 import { servicioApi } from '@/features/servicio/api'
 import { servicioKeys } from '@/features/servicio/queries'
 import { irAInicio } from '@/shared/navegacion/inicio'

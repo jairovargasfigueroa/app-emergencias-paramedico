@@ -6,7 +6,7 @@ import { Button, H2, Paragraph, Sheet, YStack, useTheme } from 'tamagui'
 import { irAInicio } from '@/shared/navegacion/inicio'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 
-import { descartarTrasladoRetirado, useTrasladoRetirado, type TrasladoRetirado } from './trasladoRetirado'
+import { descartarAtencionRetirada, useAtencionRetirada, type TrasladoRetirado } from './atencionRetirada'
 
 /** "el traslado de Ana Rojas", o solo "el traslado" si la app no tenía el nombre a mano. */
 function elTraslado(pasajero: string | null) {
@@ -39,10 +39,10 @@ function textosDelRetiro({ pasajero, motivo }: TrasladoRetirado) {
  * traslado desaparece, así que se lleva al paramédico a Inicio y se le dice por qué. Es un aviso que se cierra a mano
  * y no un toast que se va solo: un cambio así no puede pasar sin que se lea.
  */
-export function AvisoDeTrasladoRetirado() {
+export function AvisoDeAtencionRetirada() {
   const margenes = useSafeAreaInsets()
   const tema = useTheme()
-  const retiro = useTrasladoRetirado()
+  const retiro = useAtencionRetirada()
   // Mientras se cierra, sigue mostrando el último aviso en lugar de quedar vacío.
   const [ultimo, setUltimo] = useState(retiro)
   const trasladoId = retiro?.trasladoId ?? null
@@ -68,7 +68,7 @@ export function AvisoDeTrasladoRetirado() {
       open={retiro !== null}
       onOpenChange={(abierto: boolean) => {
         if (!abierto) {
-          descartarTrasladoRetirado()
+          descartarAtencionRetirada()
         }
       }}
       snapPointsMode="fit"
@@ -97,7 +97,7 @@ export function AvisoDeTrasladoRetirado() {
           </Paragraph>
         </YStack>
 
-        <BotonPrincipal onPress={descartarTrasladoRetirado}>
+        <BotonPrincipal onPress={descartarAtencionRetirada}>
           <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
             Entendido
           </Button.Text>

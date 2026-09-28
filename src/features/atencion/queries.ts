@@ -13,7 +13,7 @@ import {
   type Movilidad,
   type Ubicacion,
 } from './api'
-import { avisarSiSeRetiroElTraslado, esTrasladoEnCurso } from './trasladoRetirado'
+import { avisarSiSeRetiroLaAtencion, esTrasladoEnCurso } from './atencionRetirada'
 
 export const atencionKeys = {
   activa: (paramedicoId: number) => ['atencion', 'activa', paramedicoId] as const,
@@ -41,7 +41,7 @@ export const atencionActivaQuery = (paramedicoId: number) =>
       const activa = (await atencionApi.activa(signal)) ?? null
       // Contra lo que había al volver la respuesta, no al pedirla: si en el medio la tripulación cerró el traslado
       // desde la app, eso ya está guardado y no hay nada que avisar.
-      avisarSiSeRetiroElTraslado(client.getQueryData<Atencion | null>(queryKey), activa)
+      avisarSiSeRetiroLaAtencion(client.getQueryData<Atencion | null>(queryKey), activa)
       return activa
     },
   })

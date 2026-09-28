@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { AvisoDeTrasladoRetirado } from '@/features/atencion/AvisoDeTrasladoRetirado'
+import { AvisoDeAtencionRetirada } from '@/features/atencion/AvisoDeAtencionRetirada'
 import { useAvisoDeAtencion } from '@/features/notificaciones/useAvisoDeAtencion'
 import { useNotificaciones } from '@/features/notificaciones/useNotificaciones'
 import { useEnvioDePosicion } from '@/features/posicion/useEnvioDePosicion'
@@ -21,5 +21,5 @@ export function TareasEnServicio({ paramedicoId }: { paramedicoId: number }) {
   useEnvioDePosicion(paramedicoId, enTurno)
   useNotificaciones(paramedicoId)
   useAvisoDeAtencion(paramedicoId, enTurno)
-  return <AvisoDeTrasladoRetirado />
+  return <AvisoDeAtencionRetirada />
 }

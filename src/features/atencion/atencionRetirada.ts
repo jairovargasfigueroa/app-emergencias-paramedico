@@ -29,7 +29,7 @@ const avisadosConMotivo = new Set<number>()
  * El traslado que le sacaron a la unidad y que el paramédico todavía no leyó. Lo avisa el push o lo nota la app al
  * refrescar la atención, y lo muestra un único aviso, esté donde esté.
  */
-export function useTrasladoRetirado() {
+export function useAtencionRetirada() {
   return useSyncExternalStore(suscribir, () => actual)
 }
 
@@ -49,7 +49,7 @@ export function avisarTrasladoRetirado(retiro: TrasladoRetirado) {
   publicar({ ...retiro, pasajero: retiro.pasajero ?? mismo?.pasajero ?? null })
 }
 
-export function descartarTrasladoRetirado() {
+export function descartarAtencionRetirada() {
   publicar(null)
 }
 
@@ -63,7 +63,7 @@ export function seEstaAvisandoElRetiro(trasladoId: number) {
  * estaba haciendo ya no está, lo cerró alguien más: quien lo pidió o la central. Lo que cierra la tripulación desde
  * la app no pasa por acá: la respuesta de su acción se guarda directo, sin volver a consultar.
  */
-export function avisarSiSeRetiroElTraslado(antes: Atencion | null | undefined, despues: Atencion | null) {
+export function avisarSiSeRetiroLaAtencion(antes: Atencion | null | undefined, despues: Atencion | null) {
   // A mano, la central puede volver a darle a la unidad un traslado que ya le sacó: si se lo vuelve a sacar, se avisa.
   if (despues?.traslado) {
     avisadosConMotivo.delete(despues.traslado.id)
