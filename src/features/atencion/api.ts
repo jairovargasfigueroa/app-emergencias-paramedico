@@ -17,13 +17,18 @@ export type MotivoCancelacion =
   | 'CANCELADA_POR_SOLICITANTE'
   /** Solo en traslados: la unidad no llegaba y la central se lo pasó a otra. */
   | 'REASIGNADA'
+  /** La tripulación no respondía y la central cerró la atención desde el panel. */
+  | 'CERRADA_POR_CENTRAL'
   | 'OTRO'
 
 /**
- * Los motivos que elige la tripulación al cancelar. Los otros dos no son suyos: quien pidió el traslado lo retira, o
- * la central se lo pasa a otra unidad.
+ * Los motivos que elige la tripulación al cancelar. Los otros tres no son suyos: quien pidió el traslado lo retira, la
+ * central se lo pasa a otra unidad, o la central cierra la atención porque la tripulación no respondía.
  */
-export type MotivoCancelacionPropio = Exclude<MotivoCancelacion, 'CANCELADA_POR_SOLICITANTE' | 'REASIGNADA'>
+export type MotivoCancelacionPropio = Exclude<
+  MotivoCancelacion,
+  'CANCELADA_POR_SOLICITANTE' | 'REASIGNADA' | 'CERRADA_POR_CENTRAL'
+>
 
 /** Cómo terminó una salida que no trasladó a nadie. El motivo decide con qué estado cierra el incidente. */
 export type MotivoSinTraslado =

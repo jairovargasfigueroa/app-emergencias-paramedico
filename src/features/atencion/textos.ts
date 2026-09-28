@@ -58,5 +58,6 @@ export const TEXTO_MOTIVO_CANCELACION: Record<MotivoCancelacion, string> = {
   RECHAZADA_POR_PARAMEDICO: 'Devolviste el traslado para que se le busque otra unidad',
   CANCELADA_POR_SOLICITANTE: 'Lo canceló quien lo pidió',
   REASIGNADA: 'Se lo pasaron a otra unidad',
+  CERRADA_POR_CENTRAL: 'La cerró la central',
   OTRO: 'Otro motivo',
 }
