@@ -21,12 +21,14 @@ const MOTIVOS: { valor: MotivoSinTraslado; titulo: string; detalle: string }[] =
 type Props = {
   abierto: boolean
   enviando: boolean
+  /** El cierre registra dónde terminó la atención: sin ubicación no se puede confirmar. */
+  sinPosicion: boolean
   onConfirmar: (motivo: MotivoSinTraslado) => void
   onCerrar: () => void
 }
 
 /** No es una cancelación: la unidad fue, resolvió y lo reporta. Por eso tiene sus propios motivos. */
-export function DialogoSinTraslado({ abierto, enviando, onConfirmar, onCerrar }: Props) {
+export function DialogoSinTraslado({ abierto, enviando, sinPosicion, onConfirmar, onCerrar }: Props) {
   const margenes = useSafeAreaInsets()
   const [motivo, setMotivo] = useState<MotivoSinTraslado | null>(null)
 
@@ -107,9 +109,15 @@ export function DialogoSinTraslado({ abierto, enviando, onConfirmar, onCerrar }:
         </RadioGroup>
 
         <YStack gap={10}>
+          {/* Como en los hitos: sin ubicación el botón queda apagado y se dice por qué, en vez de no hacer nada. */}
+          {sinPosicion ? (
+            <Paragraph color="$textoSecundario" fontSize={14} lineHeight={20} text="center">
+              Esperando tu ubicación para poder terminar la atención
+            </Paragraph>
+          ) : null}
           <BotonPrincipal
-            disabled={!motivo || enviando}
-            opacity={!motivo || enviando ? 0.6 : 1}
+            disabled={!motivo || enviando || sinPosicion}
+            opacity={!motivo || enviando || sinPosicion ? 0.6 : 1}
             icon={enviando ? <Spinner color="$primarioTexto" /> : undefined}
             onPress={() => motivo && onConfirmar(motivo)}
           >

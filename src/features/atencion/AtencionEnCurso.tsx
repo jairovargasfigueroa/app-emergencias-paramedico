@@ -457,6 +457,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
       <DialogoSinTraslado
         abierto={cerrandoSinTraslado}
         enviando={sinTraslado.isPending}
+        sinPosicion={sinPosicion}
         onConfirmar={cerrarSinTraslado}
         onCerrar={() => setCerrandoSinTraslado(false)}
       />
