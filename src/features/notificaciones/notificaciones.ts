@@ -1,9 +1,12 @@
 import { isRunningInExpoGo } from 'expo'
 import { router } from 'expo-router'
-import type { DevicePushToken, NotificationResponse } from 'expo-notifications'
+import type { DevicePushToken, Notification, NotificationResponse } from 'expo-notifications'
 import { Platform } from 'react-native'
 
+import { atencionKeys } from '@/features/atencion/queries'
 import { servicioApi } from '@/features/servicio/api'
+import { servicioKeys } from '@/features/servicio/queries'
+import { queryClient } from '@/shared/query/queryClient'
 
 /** Canal de Android para los incidentes nuevos. app.json lo declara como canal por defecto de FCM. */
 export const CANAL_INCIDENTES = 'incidentes'
@@ -82,6 +85,28 @@ export async function actualizarTokenDelDispositivo(paramedicoId: number, token:
   } catch {
     // Se vuelve a registrar la próxima vez que se abra la app.
   }
+}
+
+/**
+ * Un push de traslado dice que la atención de la unidad cambió en el servidor: le asignaron un traslado o se lo
+ * sacaron. Se vuelve a pedir en el acto, para que el cambio se vea sin salir de la app y volver a entrar. Devuelve si
+ * el push era de un traslado.
+ */
+function actualizarPorTraslado(datos: Record<string, unknown> | undefined, paramedicoId: number) {
+  const trasladoId = datos?.trasladoId
+  if (typeof trasladoId !== 'string' && typeof trasladoId !== 'number') {
+    return false
+  }
+  void queryClient.invalidateQueries({ queryKey: atencionKeys.activa(paramedicoId) })
+  void queryClient.invalidateQueries({ queryKey: atencionKeys.misTraslados })
+  // Con la atención cambia también la unidad: pasa a estar en atención o vuelve a quedar disponible.
+  void queryClient.invalidateQueries({ queryKey: servicioKeys.actual(paramedicoId) })
+  return true
+}
+
+/** Push que llega con la app abierta. El aviso lo muestra el sistema; acá se refresca lo que cambió. */
+export function recibirNotificacion(notificacion: Notification, paramedicoId: number) {
+  actualizarPorTraslado(notificacion.request.content.data, paramedicoId)
 }
 
 const respuestasAtendidas = new Set<string>()

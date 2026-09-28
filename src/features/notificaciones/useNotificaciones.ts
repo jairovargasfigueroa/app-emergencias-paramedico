@@ -4,12 +4,14 @@ import {
   abrirIncidenteDeNotificacion,
   actualizarTokenDelDispositivo,
   cargarNotificaciones,
+  recibirNotificacion,
   registrarDispositivo,
 } from './notificaciones'
 
 /**
- * Registra el dispositivo, sigue los cambios de token y abre el incidente cuando se toca un push. Donde no hay push
- * (Expo Go para Android) no hace nada.
+ * Registra el dispositivo, sigue los cambios de token y abre el incidente cuando se toca un push. Con la app abierta,
+ * un push de traslado además refresca la atención: el traslado asignado aparece sin tener que tocarlo. Donde no hay
+ * push (Expo Go para Android) no hace nada.
  */
 export function useNotificaciones(paramedicoId: number) {
   useEffect(() => {
@@ -28,6 +30,9 @@ export function useNotificaciones(paramedicoId: number) {
       }
 
       suscripciones.push(
+        Notifications.addNotificationReceivedListener((notificacion) => {
+          recibirNotificacion(notificacion, paramedicoId)
+        }),
         Notifications.addNotificationResponseReceivedListener((respuesta) => {
           if (respuesta.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
             abrirIncidenteDeNotificacion(respuesta)
