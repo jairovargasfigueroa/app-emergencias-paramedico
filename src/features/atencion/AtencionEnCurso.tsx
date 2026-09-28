@@ -151,7 +151,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
     }
     return llegadaAlHospital
       .mutateAsync({ paramedicoId, atencionId: atencion.id, ubicacion })
-      .catch(alFallar('No se pudo marcar la llegada al hospital'))
+      .catch(alFallar('No se pudo marcar la llegada al destino'))
   }
 
   /** La unidad recien queda libre aca, no al entregar: hasta entonces sigue ocupada en el hospital. */
@@ -220,6 +220,8 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   }
 
   const sinPosicion = posicion === null
+  // Entregada o terminada sin traslado ya no hay nada que cancelar (ME-1): solo queda liberar la unidad.
+  const sePuedeCancelar = atencion.estado !== 'PACIENTE_ENTREGADO' && atencion.estado !== 'SIN_TRASLADO'
   const conPaciente = [atencion.nombrePaciente, atencion.documentoPaciente].filter(Boolean).join(' · ')
   const descripciones = incidente?.descripciones ?? []
 
@@ -277,7 +279,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
                 Quien avisó dice que ya no necesita la ambulancia
               </Text>
               <Paragraph color="$texto" fontSize={14} lineHeight={20}>
-                Vos decidís si seguís o te volvés.
+                Tú decides si sigues o te vuelves.
               </Paragraph>
             </YStack>
           </XStack>
@@ -345,7 +347,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
         {atencion.estado === 'PACIENTE_RECOGIDO' ? (
           <>
             <MantenerPresionado
-              texto="Mantén presionado: llegué al hospital"
+              texto="Mantén presionado: llegué al destino"
               apagado={sinPosicion}
               textoApagado="Esperando tu ubicación para poder marcar la llegada"
               onCompletar={marcarLlegadaAlHospital}
@@ -431,18 +433,21 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
               {detallesAbiertos ? 'Ocultar detalles' : 'Ver detalles del incidente'}
             </Button.Text>
           </Button>
-          <Button
-            width={48}
-            height={48}
-            p={0}
-            rounded={12}
-            bg="$superficie"
-            borderColor="$borde"
-            aria-label="Más opciones"
-            onPress={() => setMenuAbierto(true)}
-          >
-            <Feather name="more-vertical" size={18} color={tema.textoSecundario?.val} />
-          </Button>
+          {/* Cancelar es lo único que trae el menú: si no se puede cancelar, no hay menú que abrir. */}
+          {sePuedeCancelar ? (
+            <Button
+              width={48}
+              height={48}
+              p={0}
+              rounded={12}
+              bg="$superficie"
+              borderColor="$borde"
+              aria-label="Más opciones"
+              onPress={() => setMenuAbierto(true)}
+            >
+              <Feather name="more-vertical" size={18} color={tema.textoSecundario?.val} />
+            </Button>
+          ) : null}
         </XStack>
       </YStack>
 
@@ -457,12 +462,14 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
       <DialogoSinTraslado
         abierto={cerrandoSinTraslado}
         enviando={sinTraslado.isPending}
+        sinPosicion={sinPosicion}
         onConfirmar={cerrarSinTraslado}
         onCerrar={() => setCerrandoSinTraslado(false)}
       />
       <DialogoUnidadNoCorresponde
         abierto={corrigiendoUnidad}
         enviando={unidadNoCorresponde.isPending}
+        sinPosicion={sinPosicion}
         onConfirmar={devolverPorUnidad}
         onCerrar={() => setCorrigiendoUnidad(false)}
       />

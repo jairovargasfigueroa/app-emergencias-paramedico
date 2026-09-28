@@ -65,7 +65,7 @@ export function PantallaEntrega() {
     return (
       <PantallaDeEstado
         titulo="No hay un paciente por entregar"
-        descripcion="La entrega se marca después de llegar al centro de salud."
+        descripcion="La entrega se marca después de llegar al destino."
       >
         <BotonPrincipal onPress={volver}>
           <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">

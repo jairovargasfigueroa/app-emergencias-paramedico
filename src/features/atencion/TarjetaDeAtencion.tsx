@@ -39,7 +39,7 @@ export function TarjetaDeAtencion({ atencion, lugar, distancia, unidadesAcudiend
       case 'EN_HOSPITAL':
         return {
           encabezado: `Llegaste a las ${horaCorta(atencion.horaLlegadaHospital ?? atencion.horaToma)} · ${atencion.placa}`,
-          titulo: 'En el centro de salud',
+          titulo: 'En el destino',
         }
       case 'SIN_TRASLADO':
         return { encabezado: `Atención terminada · ${atencion.placa}`, titulo: 'Sin traslado' }

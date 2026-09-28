@@ -14,6 +14,8 @@ const MOVILIDADES: { valor: Movilidad; titulo: string; detalle: string }[] = [
 type Props = {
   abierto: boolean
   enviando: boolean
+  /** Devolverlo registra dónde estaba la unidad: sin ubicación no se puede confirmar. */
+  sinPosicion: boolean
   onConfirmar: (datos: { movilidad: Movilidad; oxigeno: boolean; equipo: boolean }) => void
   onCerrar: () => void
 }
@@ -22,7 +24,7 @@ type Props = {
  * No se elige un tipo de ambulancia: se corrige cómo está el paciente, que es lo que el paramédico tiene delante.
  * De ahí el sistema vuelve a derivar la unidad que hace falta, con la misma regla de siempre.
  */
-export function DialogoUnidadNoCorresponde({ abierto, enviando, onConfirmar, onCerrar }: Props) {
+export function DialogoUnidadNoCorresponde({ abierto, enviando, sinPosicion, onConfirmar, onCerrar }: Props) {
   const [movilidad, setMovilidad] = useState<Movilidad>('CAMILLA')
   const [oxigeno, setOxigeno] = useState(false)
   const [equipo, setEquipo] = useState(false)
@@ -56,9 +58,15 @@ export function DialogoUnidadNoCorresponde({ abierto, enviando, onConfirmar, onC
           onPress={() => setEquipo(!equipo)}
         />
 
+        {/* Como en los hitos: sin ubicación el botón queda apagado y se dice por qué, en vez de no hacer nada. */}
+        {sinPosicion ? (
+          <Paragraph color="$textoSecundario" fontSize={14} lineHeight={20} text="center">
+            Esperando tu ubicación para poder devolver el traslado
+          </Paragraph>
+        ) : null}
         <BotonPrincipal
-          disabled={enviando}
-          opacity={enviando ? 0.6 : 1}
+          disabled={enviando || sinPosicion}
+          opacity={enviando || sinPosicion ? 0.6 : 1}
           icon={enviando ? <Spinner size="small" color="$primarioTexto" /> : undefined}
           onPress={() => onConfirmar({ movilidad, oxigeno, equipo })}
         >
