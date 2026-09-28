@@ -4,6 +4,8 @@ import { Button, H2, Paragraph, Sheet, Text, XStack, YStack, useTheme } from 'ta
 
 type Props = {
   abierto: boolean
+  /** En un traslado, cancelar lo devuelve a la cola en vez de dejar el incidente esperando otra unidad. */
+  esTraslado: boolean
   onCancelarAtencion: () => void
   onCerrar: () => void
 }
@@ -12,7 +14,7 @@ type Props = {
  * Lo que no es el paso siguiente. Cancelar vive acá y no pegado al botón principal: una atención cancelada queda
  * cerrada para siempre (PB-05 R6).
  */
-export function MenuAtencion({ abierto, onCancelarAtencion, onCerrar }: Props) {
+export function MenuAtencion({ abierto, esTraslado, onCancelarAtencion, onCerrar }: Props) {
   const margenes = useSafeAreaInsets()
   const tema = useTheme()
 
@@ -63,7 +65,9 @@ export function MenuAtencion({ abierto, onCancelarAtencion, onCerrar }: Props) {
               Cancelar atención
             </Text>
             <Paragraph color="$textoSecundario" fontSize={14} lineHeight={19}>
-              Queda cerrada para siempre. Si vuelves a tomar la emergencia, se abre una atención nueva.
+              {esTraslado
+                ? 'Queda cerrada para siempre. El traslado vuelve a la cola y se le busca otra unidad.'
+                : 'Queda cerrada para siempre. Si vuelves a tomar la emergencia, se abre una atención nueva.'}
             </Paragraph>
           </YStack>
         </XStack>

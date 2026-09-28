@@ -29,6 +29,7 @@ import {
   type MotivoSinTraslado,
 } from './api'
 import { DialogoCancelar } from './DialogoCancelar'
+import { DialogoDevolverTraslado } from './DialogoDevolverTraslado'
 import { DialogoUnidadNoCorresponde } from './DialogoUnidadNoCorresponde'
 import { MarcadorDeTraslado } from './MarcadorDeTraslado'
 import { PanelDeTraslado } from './PanelDeTraslado'
@@ -88,6 +89,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   const [detallesAbiertos, setDetallesAbiertos] = useState(false)
   const [menuAbierto, setMenuAbierto] = useState(false)
   const [cancelando, setCancelando] = useState(false)
+  const [devolviendo, setDevolviendo] = useState(false)
   const [cerrandoSinTraslado, setCerrandoSinTraslado] = useState(false)
   const [corrigiendoUnidad, setCorrigiendoUnidad] = useState(false)
 
@@ -265,6 +267,23 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
     )
   }
 
+  /** La tripulación no puede hacer el traslado que le asignaron: vuelve a la cola y se le busca otra unidad. */
+  function devolver() {
+    cancelacion.mutate(
+      { paramedicoId, atencionId: atencion.id, motivo: 'RECHAZADA_POR_PARAMEDICO' },
+      {
+        onSuccess: () => {
+          setDevolviendo(false)
+          toast.show('Traslado devuelto', { message: MENSAJES_CANCELACION.RECHAZADA_POR_PARAMEDICO })
+        },
+        onError: (error) => {
+          setDevolviendo(false)
+          avisarError('No se pudo devolver el traslado', error)
+        },
+      },
+    )
+  }
+
   const sinPosicion = posicion === null
   // Entregada o terminada sin traslado ya no hay nada que cancelar (ME-1): solo queda liberar la unidad.
   const sePuedeCancelar = atencion.estado !== 'PACIENTE_ENTREGADO' && atencion.estado !== 'SIN_TRASLADO'
@@ -344,11 +363,20 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
               </Paragraph>
             ) : null}
             <MantenerPresionado
-              texto="Mantén presionado: llegué"
+              texto={atencion.traslado ? 'Mantén presionado: llegué al origen' : 'Mantén presionado: llegué'}
               apagado={sinPosicion}
               textoApagado="Esperando tu ubicación para poder marcar la llegada"
               onCompletar={marcarLlegada}
             />
+            {/* Devolver no es cancelar: la central asignó el traslado y la tripulación dice que no puede hacerlo. Va a
+                la vista, como terminar sin trasladar, y solo mientras la unidad no llegó al origen. */}
+            {atencion.traslado ? (
+              <Button chromeless height={48} onPress={() => setDevolviendo(true)}>
+                <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
+                  Devolver el traslado
+                </Button.Text>
+              </Button>
+            ) : null}
           </>
         ) : null}
 
@@ -444,33 +472,36 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
             style={{ maxHeight: altoPantalla * FRACCION_DETALLES }}
             contentContainerStyle={{ gap: 14, paddingHorizontal: 4, paddingTop: 4 }}
           >
-            {/* PB-03 R2: todas las descripciones, no solo la primera; pueden haber avisado varias personas. */}
-            <YStack gap={10}>
-              <Text color="$texto" fontSize={14} fontWeight="600">
-                Lo que reportaron
-              </Text>
-              {descripciones.length === 0 ? (
-                <Paragraph color="$textoSecundario" fontSize={15} lineHeight={22}>
-                  Todavía no dijeron qué pasó.
-                </Paragraph>
-              ) : (
-                descripciones.map((descripcion, indice) => (
-                  <Paragraph
-                    key={indice}
-                    color="$texto"
-                    fontSize={15}
-                    lineHeight={22}
-                    px={14}
-                    py={12}
-                    rounded={12}
-                    borderWidth={1}
-                    borderColor="$borde"
-                  >
-                    {descripcion}
+            {/* PB-03 R2: todas las descripciones, no solo la primera; pueden haber avisado varias personas. Un
+                traslado no tiene reportes: lo que se sabe de él ya está en su panel. */}
+            {atencion.traslado ? null : (
+              <YStack gap={10}>
+                <Text color="$texto" fontSize={14} fontWeight="600">
+                  Lo que reportaron
+                </Text>
+                {descripciones.length === 0 ? (
+                  <Paragraph color="$textoSecundario" fontSize={15} lineHeight={22}>
+                    Todavía no dijeron qué pasó.
                   </Paragraph>
-                ))
-              )}
-            </YStack>
+                ) : (
+                  descripciones.map((descripcion, indice) => (
+                    <Paragraph
+                      key={indice}
+                      color="$texto"
+                      fontSize={15}
+                      lineHeight={22}
+                      px={14}
+                      py={12}
+                      rounded={12}
+                      borderWidth={1}
+                      borderColor="$borde"
+                    >
+                      {descripcion}
+                    </Paragraph>
+                  ))
+                )}
+              </YStack>
+            )}
             <HitosAtencion atencion={atencion} />
           </ScrollView>
         ) : null}
@@ -479,7 +510,11 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
         <XStack items="center" justify="space-between" gap={10}>
           <Button chromeless px={4} height={48} onPress={() => setDetallesAbiertos((abierto) => !abierto)}>
             <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
-              {detallesAbiertos ? 'Ocultar detalles' : 'Ver detalles del incidente'}
+              {detallesAbiertos
+                ? 'Ocultar detalles'
+                : atencion.traslado
+                  ? 'Ver detalles del traslado'
+                  : 'Ver detalles del incidente'}
             </Button.Text>
           </Button>
           {/* Cancelar es lo único que trae el menú: si no se puede cancelar, no hay menú que abrir. */}
@@ -502,6 +537,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
 
       <MenuAtencion
         abierto={menuAbierto}
+        esTraslado={atencion.traslado !== null}
         onCancelarAtencion={() => {
           setMenuAbierto(false)
           setCancelando(true)
@@ -529,6 +565,12 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
         enviando={cancelacion.isPending}
         onConfirmar={cancelar}
         onCerrar={() => setCancelando(false)}
+      />
+      <DialogoDevolverTraslado
+        abierto={devolviendo}
+        enviando={cancelacion.isPending}
+        onConfirmar={devolver}
+        onCerrar={() => setDevolviendo(false)}
       />
     </YStack>
   )

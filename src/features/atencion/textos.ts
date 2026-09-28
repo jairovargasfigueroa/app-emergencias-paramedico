@@ -2,9 +2,10 @@ import type { TonoInsignia } from '@/shared/ui/Insignia'
 
 import type { EstadoAtencion, MotivoCancelacion, MotivoSinTraslado, Movilidad } from './api'
 
+/** Se leen en el historial de traslados: por eso se habla de origen y destino. */
 export const TEXTO_ESTADO: Record<EstadoAtencion, string> = {
   EN_CAMINO: 'En camino',
-  EN_EL_LUGAR: 'En el lugar',
+  EN_EL_LUGAR: 'En el origen',
   PACIENTE_RECOGIDO: 'Paciente a bordo',
   EN_HOSPITAL: 'En el destino',
   PACIENTE_ENTREGADO: 'Entregado',
@@ -45,7 +46,7 @@ export const TEXTO_MOTIVO_SIN_TRASLADO: Record<MotivoSinTraslado, string> = {
 export const TEXTO_MOTIVO_CANCELACION: Record<MotivoCancelacion, string> = {
   AVERIA: 'Avería de la unidad',
   NO_SE_ENCONTRO_PACIENTE: 'No se encontró al paciente',
-  DESVIADA: 'Desviada a otra emergencia',
+  DESVIADA: 'Te desviaron a otra urgencia',
   RECHAZADA_POR_PARAMEDICO: 'Devolviste el traslado para que se le busque otra unidad',
   CANCELADA_POR_SOLICITANTE: 'Lo canceló quien lo pidió',
   REASIGNADA: 'Se lo pasaron a otra unidad',

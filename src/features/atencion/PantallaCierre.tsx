@@ -91,7 +91,9 @@ export function PantallaCierre() {
         </YStack>
 
         <Paragraph color="$textoSecundario" fontSize={16} lineHeight={24} text="center">
-          Tu unidad sigue ocupada. Libérala cuando estés listo para otra emergencia.
+          {atencion?.traslado
+            ? 'Tu unidad sigue ocupada. Libérala cuando estés listo para volver a salir.'
+            : 'Tu unidad sigue ocupada. Libérala cuando estés listo para otra emergencia.'}
         </Paragraph>
 
         <BotonPrincipal

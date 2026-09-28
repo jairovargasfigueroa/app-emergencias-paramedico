@@ -19,7 +19,8 @@ type Paso = {
  */
 function pasosDe(atencion: Atencion): Paso[] {
   const posibles: (Paso | null)[] = [
-    { clave: 'toma', titulo: 'Tomaste el traslado', hora: atencion.horaToma },
+    // No se toma: lo asigna la central.
+    { clave: 'toma', titulo: 'Te asignaron el traslado', hora: atencion.horaToma },
     conHora('llegada', 'Llegaste al origen', atencion.horaLlegada),
     conHora('no-listo', 'El paciente no estaba listo', atencion.horaAvisoNoListo, true),
     conHora('recogida', 'Paciente a bordo', atencion.horaRecogida),
