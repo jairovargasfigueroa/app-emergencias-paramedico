@@ -309,6 +309,8 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   // Entregada o terminada sin traslado ya no hay nada que cancelar (ME-1): solo queda liberar la unidad.
   const sePuedeCancelar = atencion.estado !== 'PACIENTE_ENTREGADO' && atencion.estado !== 'SIN_TRASLADO'
   const conPaciente = [atencion.nombrePaciente, atencion.documentoPaciente].filter(Boolean).join(' · ')
+  // En un traslado se sabe quién viaja desde antes de salir: no hay paciente que anotar.
+  const seAnotaPaciente = atencion.traslado === null
   const descripciones = incidente?.descripciones ?? []
 
   return (
@@ -409,11 +411,13 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
               textoApagado="Esperando tu ubicación para poder marcar la recogida"
               onCompletar={marcarRecogida}
             />
-            <Tarea
-              texto={conPaciente || 'Datos del paciente · opcional'}
-              accion={conPaciente ? 'Editar' : 'Agregar'}
-              onPress={() => router.push('/atencion/paciente')}
-            />
+            {seAnotaPaciente ? (
+              <Tarea
+                texto={conPaciente || 'Datos del paciente · opcional'}
+                accion={conPaciente ? 'Editar' : 'Agregar'}
+                onPress={() => router.push('/atencion/paciente')}
+              />
+            ) : null}
             {atencion.traslado ? (
               <>
                 {/* Avisado que no estaba listo, el botón deja lugar a la espera en curso, que dice hasta cuándo. */}
@@ -454,12 +458,14 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
               textoApagado="Esperando tu ubicación para poder marcar la llegada"
               onCompletar={marcarLlegadaAlHospital}
             />
-            <Tarea
-              texto={conPaciente || 'Falta anotar al paciente'}
-              destacada={!conPaciente}
-              accion={conPaciente ? 'Editar' : 'Agregar'}
-              onPress={() => router.push('/atencion/paciente')}
-            />
+            {seAnotaPaciente ? (
+              <Tarea
+                texto={conPaciente || 'Falta anotar al paciente'}
+                destacada={!conPaciente}
+                accion={conPaciente ? 'Editar' : 'Agregar'}
+                onPress={() => router.push('/atencion/paciente')}
+              />
+            ) : null}
           </>
         ) : null}
 
@@ -470,12 +476,14 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
                 Entregar al paciente
               </Button.Text>
             </BotonPrincipal>
-            <Tarea
-              texto={conPaciente || 'Falta anotar al paciente'}
-              destacada={!conPaciente}
-              accion={conPaciente ? 'Editar' : 'Agregar'}
-              onPress={() => router.push('/atencion/paciente')}
-            />
+            {seAnotaPaciente ? (
+              <Tarea
+                texto={conPaciente || 'Falta anotar al paciente'}
+                destacada={!conPaciente}
+                accion={conPaciente ? 'Editar' : 'Agregar'}
+                onPress={() => router.push('/atencion/paciente')}
+              />
+            ) : null}
           </>
         ) : null}
 
