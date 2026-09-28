@@ -469,6 +469,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
       <DialogoUnidadNoCorresponde
         abierto={corrigiendoUnidad}
         enviando={unidadNoCorresponde.isPending}
+        sinPosicion={sinPosicion}
         onConfirmar={devolverPorUnidad}
         onCerrar={() => setCorrigiendoUnidad(false)}
       />
