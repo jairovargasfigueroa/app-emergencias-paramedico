@@ -220,6 +220,8 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   }
 
   const sinPosicion = posicion === null
+  // Entregada o terminada sin traslado ya no hay nada que cancelar (ME-1): solo queda liberar la unidad.
+  const sePuedeCancelar = atencion.estado !== 'PACIENTE_ENTREGADO' && atencion.estado !== 'SIN_TRASLADO'
   const conPaciente = [atencion.nombrePaciente, atencion.documentoPaciente].filter(Boolean).join(' · ')
   const descripciones = incidente?.descripciones ?? []
 
@@ -431,18 +433,21 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
               {detallesAbiertos ? 'Ocultar detalles' : 'Ver detalles del incidente'}
             </Button.Text>
           </Button>
-          <Button
-            width={48}
-            height={48}
-            p={0}
-            rounded={12}
-            bg="$superficie"
-            borderColor="$borde"
-            aria-label="Más opciones"
-            onPress={() => setMenuAbierto(true)}
-          >
-            <Feather name="more-vertical" size={18} color={tema.textoSecundario?.val} />
-          </Button>
+          {/* Cancelar es lo único que trae el menú: si no se puede cancelar, no hay menú que abrir. */}
+          {sePuedeCancelar ? (
+            <Button
+              width={48}
+              height={48}
+              p={0}
+              rounded={12}
+              bg="$superficie"
+              borderColor="$borde"
+              aria-label="Más opciones"
+              onPress={() => setMenuAbierto(true)}
+            >
+              <Feather name="more-vertical" size={18} color={tema.textoSecundario?.val} />
+            </Button>
+          ) : null}
         </XStack>
       </YStack>
 
