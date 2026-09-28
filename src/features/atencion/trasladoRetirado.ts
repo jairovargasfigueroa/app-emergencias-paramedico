@@ -59,6 +59,10 @@ export function seEstaAvisandoElRetiro(trasladoId: number) {
  * la app no pasa por acá: la respuesta de su acción se guarda directo, sin volver a consultar.
  */
 export function avisarSiSeRetiroElTraslado(antes: Atencion | null | undefined, despues: Atencion | null) {
+  // A mano, la central puede volver a darle a la unidad un traslado que ya le sacó: si se lo vuelve a sacar, se avisa.
+  if (despues?.traslado) {
+    avisadosConMotivo.delete(despues.traslado.id)
+  }
   if (!antes?.traslado || !EN_CURSO.includes(antes.estado) || despues?.id === antes.id) {
     return
   }
