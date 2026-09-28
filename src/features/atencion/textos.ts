@@ -1,6 +1,6 @@
 import type { TonoInsignia } from '@/shared/ui/Insignia'
 
-import type { EstadoAtencion, MotivoCancelacion, MotivoSinTraslado, Movilidad } from './api'
+import type { EstadoAtencion, MotivoCancelacion, MotivoSinTraslado, Movilidad, TipoUnidad } from './api'
 
 /** Se leen en el historial de traslados: por eso se habla de origen y destino. */
 export const TEXTO_ESTADO: Record<EstadoAtencion, string> = {
@@ -27,6 +27,14 @@ export const TEXTO_MOVILIDAD: Record<Movilidad, string> = {
   CAMINA_CON_AYUDA: 'Camina con ayuda',
   SILLA_DE_RUEDAS: 'Silla de ruedas',
   CAMILLA: 'Camilla',
+}
+
+/** En corto, como las nombra el panel del administrador: la tripulación sabe qué es cada tipo. */
+export const TEXTO_TIPO_UNIDAD: Record<TipoUnidad, string> = {
+  IA: 'Tipo IA',
+  IB: 'Tipo IB',
+  II: 'Tipo II',
+  III: 'Tipo III',
 }
 
 /**
