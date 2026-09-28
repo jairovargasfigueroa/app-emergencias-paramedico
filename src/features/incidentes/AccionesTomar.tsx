@@ -12,10 +12,17 @@ import { DialogoSumarse } from './DialogoSumarse'
 import { volverAlMapa } from './PantallaIncidente'
 import { sumarseAIncidenteMutation, tomarIncidenteMutation } from './queries'
 
-/** PB-04 R5: solo una ambulancia disponible y activa puede tomar o sumarse. Explica por qué no. */
-function motivoNoDisponible(enServicio: boolean, estado: string | undefined) {
+/**
+ * Solo acude una ambulancia disponible y activa, con el paramédico de turno. Estar asignado no alcanza: si el
+ * compañero está trabajando la unidad figura disponible, pero el que no abrió su turno no está trabajando. Explica
+ * por qué no.
+ */
+function motivoNoDisponible(enServicio: boolean, enTurno: boolean, estado: string | undefined) {
   if (!enServicio) {
     return 'No estás en servicio.'
+  }
+  if (!enTurno) {
+    return 'No estás de turno.'
   }
   if (estado === 'EN_ATENCION') {
     return 'Ya tienes una atención en curso.'
@@ -39,7 +46,7 @@ export function AccionesTomar({ incidente }: { incidente: IncidenteAbierto }) {
   const acudiendo = useRef(false)
 
   const motivo = servicio.data
-    ? motivoNoDisponible(servicio.data.enServicio, servicio.data.ambulancia?.estado)
+    ? motivoNoDisponible(servicio.data.enServicio, servicio.data.turno !== null, servicio.data.ambulancia?.estado)
     : null
   const puedeAcudir = servicio.data !== undefined && motivo === null
 
