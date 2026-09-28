@@ -86,7 +86,7 @@ export function PantallaCierre() {
         <YStack self="stretch" gap={10} py={16} borderTopWidth={1} borderBottomWidth={1} borderColor="$borde">
           <Tiempo etiqueta="Llegada" hora={tiempos.llegada} />
           <Tiempo etiqueta="Paciente a bordo" hora={tiempos.recogida} />
-          <Tiempo etiqueta="Llegada al hospital" hora={tiempos.hospital} />
+          <Tiempo etiqueta="Llegada al destino" hora={tiempos.hospital} />
           <Tiempo etiqueta="Entrega" hora={tiempos.entrega} />
         </YStack>
 

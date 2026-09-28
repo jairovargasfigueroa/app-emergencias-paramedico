@@ -17,7 +17,7 @@ const HITOS_TRASLADO: Hito[] = [
   { estado: 'EN_CAMINO', titulo: 'En camino', hora: (a) => a.horaToma, textoHora: 'Tomado a las' },
   { estado: 'EN_EL_LUGAR', titulo: 'En el lugar', hora: (a) => a.horaLlegada, textoHora: 'Llegada a las' },
   { estado: 'PACIENTE_RECOGIDO', titulo: 'Paciente recogido', hora: (a) => a.horaRecogida, textoHora: 'Recogido a las' },
-  { estado: 'EN_HOSPITAL', titulo: 'En el hospital', hora: (a) => a.horaLlegadaHospital, textoHora: 'Llegada a las' },
+  { estado: 'EN_HOSPITAL', titulo: 'En el destino', hora: (a) => a.horaLlegadaHospital, textoHora: 'Llegada a las' },
   { estado: 'PACIENTE_ENTREGADO', titulo: 'Paciente entregado', hora: (a) => a.horaEntrega, textoHora: 'Entregado a las' },
 ]
 

@@ -151,7 +151,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
     }
     return llegadaAlHospital
       .mutateAsync({ paramedicoId, atencionId: atencion.id, ubicacion })
-      .catch(alFallar('No se pudo marcar la llegada al hospital'))
+      .catch(alFallar('No se pudo marcar la llegada al destino'))
   }
 
   /** La unidad recien queda libre aca, no al entregar: hasta entonces sigue ocupada en el hospital. */
@@ -347,7 +347,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
         {atencion.estado === 'PACIENTE_RECOGIDO' ? (
           <>
             <MantenerPresionado
-              texto="Mantén presionado: llegué al hospital"
+              texto="Mantén presionado: llegué al destino"
               apagado={sinPosicion}
               textoApagado="Esperando tu ubicación para poder marcar la llegada"
               onCompletar={marcarLlegadaAlHospital}
