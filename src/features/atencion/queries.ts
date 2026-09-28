@@ -41,7 +41,13 @@ export const atencionActivaQuery = (paramedicoId: number) =>
       const activa = (await atencionApi.activa(signal)) ?? null
       // Contra lo que había al volver la respuesta, no al pedirla: si en el medio la tripulación cerró la atención
       // desde la app, eso ya está guardado y no hay nada que avisar.
-      avisarSiSeRetiroLaAtencion(client.getQueryData<Atencion | null>(queryKey), activa)
+      const antes = client.getQueryData<Atencion | null>(queryKey)
+      avisarSiSeRetiroLaAtencion(antes, activa)
+      // Si la cerró alguien más, cambió también la unidad: quedó disponible, o fuera de servicio si así la dejó la
+      // central. Lo que cierra la tripulación ya vuelve a pedir el servicio al guardar la respuesta.
+      if (antes && activa?.id !== antes.id) {
+        void client.invalidateQueries({ queryKey: servicioKeys.actual(paramedicoId) })
+      }
       return activa
     },
   })
