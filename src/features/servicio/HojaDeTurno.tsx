@@ -110,7 +110,7 @@ export function HojaDeTurno({ abierta, placa, inicio, onCerrar }: Props) {
         ) : null}
 
         <Paragraph color="$textoSecundario" fontSize={15} lineHeight={22}>
-          Al salir dejás de compartir tu ubicación y tu unidad queda sin turno, así que nadie va a contar con ella
+          Al salir dejas de compartir tu ubicación y tu unidad queda sin turno, así que nadie va a contar con ella
           hasta que entre alguien.
         </Paragraph>
 
