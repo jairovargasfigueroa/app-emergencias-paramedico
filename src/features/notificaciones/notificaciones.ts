@@ -133,17 +133,34 @@ function actualizarPorTraslado(datos: Record<string, unknown> | undefined, param
   return true
 }
 
+/**
+ * Un push de despacho dice que la central mandó a la unidad a una emergencia: la atención ya está creada en el
+ * servidor, igual que al tomarla. Se vuelve a pedir en el acto junto con el servicio, porque la unidad pasa a estar en
+ * atención. Devuelve si el push era de un despacho.
+ */
+function actualizarPorDespacho(datos: Record<string, unknown> | undefined, paramedicoId: number) {
+  if (datos?.tipo !== 'INCIDENTE_ASIGNADO') {
+    return false
+  }
+  void queryClient.invalidateQueries({ queryKey: atencionKeys.activa(paramedicoId) })
+  void queryClient.invalidateQueries({ queryKey: servicioKeys.actual(paramedicoId) })
+  return true
+}
+
 /** Push que llega con la app abierta. El aviso lo muestra el sistema; acá se refresca lo que cambió. */
 export function recibirNotificacion(notificacion: Notification, paramedicoId: number) {
-  actualizarPorTraslado(notificacion.request.content.data, paramedicoId)
+  const datos = notificacion.request.content.data
+  if (!actualizarPorDespacho(datos, paramedicoId)) {
+    actualizarPorTraslado(datos, paramedicoId)
+  }
 }
 
 const respuestasAtendidas = new Set<string>()
 
 /**
- * Al tocar el push, abre lo que el aviso trae: el incidente si vino de una emergencia, o el inicio si vino de un
- * traslado, porque el traslado asignado se atiende desde ahí igual que cualquier atención en curso. Si se lo
- * sacaron, ahí mismo se ve el aviso de por qué.
+ * Al tocar el push, abre lo que el aviso trae: el incidente si es una emergencia nueva, para decidir si tomarla, o el
+ * inicio si la central mandó a la unidad a una emergencia o si vino de un traslado, porque lo asignado se atiende desde
+ * ahí igual que cualquier atención en curso. Si le sacaron el traslado, ahí mismo se ve el aviso de por qué.
  */
 export function abrirIncidenteDeNotificacion(respuesta: NotificationResponse, paramedicoId: number) {
   const identificador = respuesta.notification.request.identifier
@@ -152,6 +169,11 @@ export function abrirIncidenteDeNotificacion(respuesta: NotificationResponse, pa
   }
   respuestasAtendidas.add(identificador)
   const datos = respuesta.notification.request.content.data
+  // El despacho también trae el incidente, pero no hay nada que tomar: la unidad ya va para allá.
+  if (actualizarPorDespacho(datos, paramedicoId)) {
+    irAInicio()
+    return
+  }
   const incidenteId = datos?.incidenteId
   if (typeof incidenteId === 'string' || typeof incidenteId === 'number') {
     router.push({ pathname: '/incidente/[id]', params: { id: String(incidenteId) } })
