@@ -4,7 +4,8 @@ import { Text, YStack } from 'tamagui'
 import type { IncidenteAbierto } from './api'
 
 type Props = {
-  incidente: IncidenteAbierto
+  /** Del incidente solo hacen falta dónde está y cuántos afectados reportaron. */
+  incidente: Pick<IncidenteAbierto, 'latitud' | 'longitud' | 'cantidadAfectados'>
   /** Marcador agrandado: el seleccionado en la lista, o el único de la pantalla. */
   destacado?: boolean
   /** Lleva demasiado tiempo sin que nadie acuda: mismo tono de aviso que su tarjeta. */
