@@ -157,8 +157,8 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
       toast.show(titulo, { message: mensajeDeError(error) })
       return
     }
-    // La atención cambió en otro lado (transición inválida o ya finalizada): se vuelve a consultar. Si era un traslado
-    // y se lo sacaron a la unidad, su aviso dice qué pasó y el error de la acción sobra.
+    // La atención cambió en otro lado (transición inválida o ya finalizada): se vuelve a consultar. Si ya no es de la
+    // unidad, su aviso dice qué pasó y el error de la acción sobra.
     void reconsultarTrasConflicto(queryClient, paramedicoId, atencion).then((retirado) => {
       if (!retirado) {
         toast.show(titulo, { message: mensajeDeError(error) })

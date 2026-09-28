@@ -13,7 +13,7 @@ import {
   type Movilidad,
   type Ubicacion,
 } from './api'
-import { avisarSiSeRetiroElTraslado, esTrasladoEnCurso } from './trasladoRetirado'
+import { avisarSiSeRetiroLaAtencion, esAtencionEnCurso } from './atencionRetirada'
 
 export const atencionKeys = {
   activa: (paramedicoId: number) => ['atencion', 'activa', paramedicoId] as const,
@@ -32,16 +32,22 @@ function ocupaLaUnidad(atencion: Atencion) {
 
 /**
  * Atención activa de la ambulancia del paramédico, o `null` si no tiene. Cada consulta se compara con lo que la app
- * mostraba: si el traslado en curso ya no está, se lo sacaron a la unidad y hay que decírselo.
+ * mostraba: si la atención en curso ya no está, la cerró alguien más y hay que decírselo.
  */
 export const atencionActivaQuery = (paramedicoId: number) =>
   queryOptions({
     queryKey: atencionKeys.activa(paramedicoId),
     queryFn: async ({ client, queryKey, signal }) => {
       const activa = (await atencionApi.activa(signal)) ?? null
-      // Contra lo que había al volver la respuesta, no al pedirla: si en el medio la tripulación cerró el traslado
+      // Contra lo que había al volver la respuesta, no al pedirla: si en el medio la tripulación cerró la atención
       // desde la app, eso ya está guardado y no hay nada que avisar.
-      avisarSiSeRetiroElTraslado(client.getQueryData<Atencion | null>(queryKey), activa)
+      const antes = client.getQueryData<Atencion | null>(queryKey)
+      avisarSiSeRetiroLaAtencion(antes, activa)
+      // Si la cerró alguien más, cambió también la unidad: quedó disponible, o fuera de servicio si así la dejó la
+      // central. Lo que cierra la tripulación ya vuelve a pedir el servicio al guardar la respuesta.
+      if (antes && activa?.id !== antes.id) {
+        void client.invalidateQueries({ queryKey: servicioKeys.actual(paramedicoId) })
+      }
       return activa
     },
   })
@@ -104,13 +110,13 @@ export function pasajeroDelTraslado(queryClient: QueryClient, paramedicoId: numb
 }
 
 /**
- * Tras un 409 la atención pudo haber cambiado en otro lado, así que se vuelve a pedir. Devuelve si era un traslado en
+ * Tras un 409 la atención pudo haber cambiado en otro lado, así que se vuelve a pedir. Devuelve si era una atención en
  * curso que dejó de ser de la unidad: eso tiene su propio aviso, que dice qué pasó mejor que el error de la acción.
  */
 export async function reconsultarTrasConflicto(queryClient: QueryClient, paramedicoId: number, atencion: Atencion) {
   await queryClient.invalidateQueries({ queryKey: atencionKeys.activa(paramedicoId) })
   const vigente = queryClient.getQueryData(atencionActivaQuery(paramedicoId).queryKey)
-  return esTrasladoEnCurso(atencion) && vigente !== undefined && vigente?.id !== atencion.id
+  return esAtencionEnCurso(atencion) && vigente !== undefined && vigente?.id !== atencion.id
 }
 
 type SobreAtencion = {
