@@ -31,6 +31,7 @@ import {
 import { DialogoCancelar } from './DialogoCancelar'
 import { DialogoDevolverTraslado } from './DialogoDevolverTraslado'
 import { DialogoUnidadNoCorresponde } from './DialogoUnidadNoCorresponde'
+import { EsperaDelPaciente } from './EsperaDelPaciente'
 import { MarcadorDeTraslado } from './MarcadorDeTraslado'
 import { PanelDeTraslado } from './PanelDeTraslado'
 import { DialogoSinTraslado } from './DialogoSinTraslado'
@@ -91,6 +92,8 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   const [cancelando, setCancelando] = useState(false)
   const [devolviendo, setDevolviendo] = useState(false)
   const [cerrandoSinTraslado, setCerrandoSinTraslado] = useState(false)
+  // El motivo con que se abre el cierre sin traslado cuando lo abre un botón que ya lo dice, como retirarse tras la espera.
+  const [motivoSugerido, setMotivoSugerido] = useState<MotivoSinTraslado | null>(null)
   const [corrigiendoUnidad, setCorrigiendoUnidad] = useState(false)
 
   const llegada = useMutation(marcarLlegadaMutation(queryClient))
@@ -209,7 +212,10 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
       .catch(alFallar('No se pudo liberar la unidad'))
   }
 
-  /** Solo deja la marca con su hora: si espera o se retira lo decide el paramédico con los otros botones. */
+  /**
+   * Deja la marca con su hora y el servidor arranca la espera. Hasta que se cumple, la unidad no se puede retirar
+   * por eso; subir al paciente se puede siempre.
+   */
   function avisarPacienteNoListo() {
     noListo.mutate(
       { paramedicoId, atencionId: atencion.id },
@@ -232,6 +238,11 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
         },
       },
     )
+  }
+
+  function abrirCierreSinTraslado(motivo: MotivoSinTraslado | null) {
+    setMotivoSugerido(motivo)
+    setCerrandoSinTraslado(true)
   }
 
   function cerrarSinTraslado(motivo: MotivoSinTraslado) {
@@ -395,16 +406,20 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
             />
             {atencion.traslado ? (
               <>
-                <Button
-                  chromeless
-                  height={48}
-                  disabled={noListo.isPending || atencion.horaAvisoNoListo !== null}
-                  onPress={() => avisarPacienteNoListo()}
-                >
-                  <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
-                    {atencion.horaAvisoNoListo ? 'Ya avisaste que no estaba listo' : 'El paciente no está listo'}
-                  </Button.Text>
-                </Button>
+                {/* Avisado que no estaba listo, el botón deja lugar a la espera en curso, que dice hasta cuándo. */}
+                {atencion.horaAvisoNoListo === null ? (
+                  <Button chromeless height={48} disabled={noListo.isPending} onPress={() => avisarPacienteNoListo()}>
+                    <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
+                      El paciente no está listo
+                    </Button.Text>
+                  </Button>
+                ) : null}
+                {atencion.esperaHasta ? (
+                  <EsperaDelPaciente
+                    esperaHasta={atencion.esperaHasta}
+                    onRetirarse={() => abrirCierreSinTraslado('PACIENTE_NO_LISTO')}
+                  />
+                ) : null}
                 <Button chromeless height={48} onPress={() => setCorrigiendoUnidad(true)}>
                   <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
                     La unidad no corresponde
@@ -413,7 +428,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
               </>
             ) : null}
             {/* No trasladar es un desenlace normal, no una cancelación: va a la vista, no escondido en el menú. */}
-            <Button chromeless height={48} onPress={() => setCerrandoSinTraslado(true)}>
+            <Button chromeless height={48} onPress={() => abrirCierreSinTraslado(null)}>
               <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
                 Terminar sin trasladar
               </Button.Text>
@@ -546,6 +561,9 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
       />
       <DialogoSinTraslado
         abierto={cerrandoSinTraslado}
+        esTraslado={atencion.traslado !== null}
+        esperaHasta={atencion.esperaHasta}
+        motivoInicial={motivoSugerido}
         enviando={sinTraslado.isPending}
         sinPosicion={sinPosicion}
         onConfirmar={cerrarSinTraslado}

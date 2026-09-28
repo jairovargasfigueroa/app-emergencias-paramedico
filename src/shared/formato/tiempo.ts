@@ -25,6 +25,12 @@ export function duracionLarga(iso: string, ahora: number = Date.now()): string {
   return horas === 1 ? '1 hora' : `${horas} horas`
 }
 
+/** "12:05", "0:42": lo que falta hasta una fecha ISO, para una cuenta regresiva que avanza de a segundo. */
+export function tiempoRestante(hastaIso: string, ahora: number = Date.now()): string {
+  const segundos = Math.max(0, Math.ceil((new Date(hastaIso).getTime() - ahora) / 1000))
+  return `${Math.floor(segundos / 60)}:${String(segundos % 60).padStart(2, '0')}`
+}
+
 /** "hace 40 s", "hace 4 min", "hace 2 h" desde una fecha ISO hasta `ahora`. */
 export function tiempoTranscurrido(iso: string, ahora: number = Date.now()): string {
   return `hace ${duracionDesde(iso, ahora)}`
