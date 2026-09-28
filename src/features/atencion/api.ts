@@ -156,6 +156,47 @@ export function incidenteDeLaAtencion(atencion: Atencion) {
   }
 }
 
+/** El punto del traslado al que va la unidad. */
+export type PuntoDelTraslado = {
+  tipo: 'origen' | 'destino'
+  ubicacion: Ubicacion
+}
+
+/**
+ * Hacia dónde va la unidad en un traslado: al origen hasta subir al paciente y al destino desde ahí. Nulo en una
+ * emergencia, que tiene su incidente.
+ */
+export function puntoDelTraslado(atencion: Atencion): PuntoDelTraslado | null {
+  const traslado = atencion.traslado
+  if (!traslado) {
+    return null
+  }
+  return atencion.horaRecogida === null
+    ? { tipo: 'origen', ubicacion: traslado.origen }
+    : { tipo: 'destino', ubicacion: traslado.destino }
+}
+
+/**
+ * El punto del traslado en palabras: cómo se llama y qué más ayuda a encontrarlo. El destino se nombra por su centro
+ * de salud, si es uno; el origen, por la dirección que resuelve el teléfono. La referencia que dejó quien lo pidió
+ * va aparte, o de nombre si no hay nada mejor.
+ */
+export function lugarDelTraslado(
+  traslado: TrasladoDeAtencion,
+  tipo: PuntoDelTraslado['tipo'],
+  direccion: string | null | undefined,
+): { nombre: string | null; referencia: string | null } {
+  if (tipo === 'destino') {
+    const nombre = traslado.centroSaludDestino ?? direccion ?? null
+    return nombre
+      ? { nombre, referencia: traslado.destinoDetalle }
+      : { nombre: traslado.destinoDetalle, referencia: null }
+  }
+  return direccion
+    ? { nombre: direccion, referencia: traslado.origenReferencia }
+    : { nombre: traslado.origenReferencia, referencia: null }
+}
+
 /**
  * Cuándo terminó el trabajo: la entrega, el cierre sin traslado o la cancelación. No la liberación, que es cuándo
  * la unidad volvió a estar disponible y llega más tarde, después del papeleo y la limpieza. `null` si sigue en curso.

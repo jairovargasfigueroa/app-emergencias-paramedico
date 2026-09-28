@@ -1,5 +1,6 @@
 import { mutationOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
 
+import { direccionAproximada } from '@/features/incidentes/direcciones'
 import { servicioKeys } from '@/features/servicio/queries'
 
 import {
@@ -18,6 +19,7 @@ export const atencionKeys = {
   activa: (paramedicoId: number) => ['atencion', 'activa', paramedicoId] as const,
   misTraslados: ['atencion', 'mis-traslados'] as const,
   centrosSalud: ['centros-salud'] as const,
+  direccion: ({ latitud, longitud }: Ubicacion) => ['direccion-punto', latitud, longitud] as const,
 }
 
 /**
@@ -49,6 +51,19 @@ export const misTrasladosQuery = () =>
   queryOptions({
     queryKey: atencionKeys.misTraslados,
     queryFn: ({ signal }) => atencionApi.misTraslados(signal),
+  })
+
+/**
+ * Dirección aproximada de un punto del traslado, resuelta en el teléfono igual que la de un incidente. Se cachea para
+ * siempre por punto: el origen y el destino no se mueven y la consulta no tiene por qué repetirse.
+ */
+export const direccionDelPuntoQuery = (punto: Ubicacion) =>
+  queryOptions({
+    queryKey: atencionKeys.direccion(punto),
+    queryFn: () => direccionAproximada(punto.latitud, punto.longitud),
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: 1,
   })
 
 /** Catálogo de centros de salud. Puede estar vacío: la entrega nunca se bloquea por eso (PB-05 R4). */

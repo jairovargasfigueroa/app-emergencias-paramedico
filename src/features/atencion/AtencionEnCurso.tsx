@@ -1,7 +1,7 @@
 import Feather from '@expo/vector-icons/Feather'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { router } from 'expo-router'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ScrollView, StyleSheet, useColorScheme, useWindowDimensions } from 'react-native'
 import MapView from 'react-native-maps'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -21,6 +21,8 @@ import { MantenerPresionado } from '@/shared/ui/MantenerPresionado'
 
 import {
   incidenteDeLaAtencion,
+  lugarDelTraslado,
+  puntoDelTraslado,
   type Atencion,
   type Movilidad,
   type MotivoCancelacionPropio,
@@ -28,6 +30,7 @@ import {
 } from './api'
 import { DialogoCancelar } from './DialogoCancelar'
 import { DialogoUnidadNoCorresponde } from './DialogoUnidadNoCorresponde'
+import { MarcadorDeTraslado } from './MarcadorDeTraslado'
 import { PanelDeTraslado } from './PanelDeTraslado'
 import { DialogoSinTraslado } from './DialogoSinTraslado'
 import { HitosAtencion } from './HitosAtencion'
@@ -36,6 +39,7 @@ import { TarjetaDeAtencion } from './TarjetaDeAtencion'
 import {
   cancelarAtencionMutation,
   cerrarSinTrasladoMutation,
+  direccionDelPuntoQuery,
   liberarMutation,
   marcarLlegadaAlHospitalMutation,
   marcarLlegadaMutation,
@@ -62,8 +66,8 @@ const MENSAJES_CANCELACION: Record<MotivoCancelacionPropio, string> = {
 const FRACCION_DETALLES = 0.4
 
 /**
- * A partir de esta distancia al incidente se recuerda cuánto falta antes de marcar la llegada: el hito congela la
- * ubicación (PB-05 R2) y no se deshace. Es solo un aviso, nunca impide marcarla.
+ * A partir de esta distancia al incidente, o al origen de un traslado, se recuerda cuánto falta antes de marcar la
+ * llegada: el hito congela la ubicación (PB-05 R2) y no se deshace. Es solo un aviso, nunca impide marcarla.
  */
 const METROS_PARA_AVISAR_LA_DISTANCIA = 200
 
@@ -100,20 +104,48 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   // liberación ya no está ahí. Mientras tanto se usan los datos que llegaron con la atención.
   const enVivo = incidentes.find((abierto) => abierto.id === atencion.incidenteId)
   const incidente = enVivo ?? incidenteDeLaAtencion(atencion)
-  const direccion = useQuery({
+  const direccionIncidente = useQuery({
     ...direccionIncidenteQuery(incidente ?? { id: atencion.incidenteId ?? 0, latitud: 0, longitud: 0 }),
     enabled: incidente !== undefined,
   }).data
-  const metrosAlLugar = posicion && incidente ? distanciaEnMetros(posicion, incidente) : null
+  // En un traslado no hay incidente: se va al origen hasta subir al paciente y al destino desde ahí. Un destino que es
+  // un centro de salud ya tiene nombre, así que no hace falta buscarle la dirección.
+  const punto = puntoDelTraslado(atencion)
+  const conNombre = punto?.tipo === 'destino' && atencion.traslado?.centroSaludDestino != null
+  const direccionDelPunto = useQuery({
+    ...direccionDelPuntoQuery(punto?.ubicacion ?? { latitud: 0, longitud: 0 }),
+    enabled: punto !== null && !conNombre,
+  }).data
+  const haciaDonde = incidente ?? punto?.ubicacion
+  const metrosAlLugar = posicion && haciaDonde ? distanciaEnMetros(posicion, haciaDonde) : null
   const distancia = metrosAlLugar === null ? null : formatearDistancia(metrosAlLugar)
-  const lugar = tituloDelLugar(direccion, distancia)
+  const delTraslado = atencion.traslado && punto ? lugarDelTraslado(atencion.traslado, punto.tipo, direccionDelPunto) : null
+  const lugar = punto
+    ? tituloDelLugar(delTraslado?.nombre, distancia, punto.tipo === 'origen' ? 'Origen del traslado' : 'Destino del traslado')
+    : tituloDelLugar(direccionIncidente, distancia)
   const avisoDeDistancia =
-    metrosAlLugar !== null && metrosAlLugar > METROS_PARA_AVISAR_LA_DISTANCIA ? textoDeDistancia(metrosAlLugar) : null
+    metrosAlLugar !== null && metrosAlLugar > METROS_PARA_AVISAR_LA_DISTANCIA
+      ? textoDeDistancia(metrosAlLugar, punto ? punto.tipo : 'lugar')
+      : null
 
+  const mapa = useRef<MapView>(null)
   const [regionInicial] = useState(() => {
-    const inicio = incidente ?? leerPosicionActual()
+    const inicio = incidente ?? punto?.ubicacion ?? leerPosicionActual()
     return regionAlrededorDe(inicio ?? CENTRO_POR_DEFECTO, inicio ? DELTA_BARRIO : DELTA_CIUDAD)
   })
+
+  // Al subir al paciente el marcador pasa del origen al destino, que puede quedar fuera de la vista: se lleva la
+  // cámara hasta allá.
+  const tipoDePunto = punto?.tipo
+  const ubicacionDelPunto = punto?.ubicacion
+  const tipoMostrado = useRef(tipoDePunto)
+  useEffect(() => {
+    if (!ubicacionDelPunto || tipoDePunto === tipoMostrado.current) {
+      return
+    }
+    tipoMostrado.current = tipoDePunto
+    mapa.current?.animateToRegion(regionAlrededorDe(ubicacionDelPunto, DELTA_BARRIO), 600)
+  }, [tipoDePunto, ubicacionDelPunto])
 
   function avisarError(titulo: string, error: unknown) {
     if (!(error instanceof ErrorApi && error.status === 409)) {
@@ -242,6 +274,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   return (
     <YStack flex={1} bg="$fondo">
       <MapView
+        ref={mapa}
         style={StyleSheet.absoluteFill}
         initialRegion={regionInicial}
         showsUserLocation
@@ -252,12 +285,14 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
         userInterfaceStyle={esquema}
       >
         {incidente ? <MarcadorIncidente incidente={incidente} destacado /> : null}
+        {punto ? <MarcadorDeTraslado key={punto.tipo} punto={punto} /> : null}
       </MapView>
 
       <YStack position="absolute" t={margenes.top + 12} l={16} r={16}>
         <TarjetaDeAtencion
           atencion={atencion}
           lugar={lugar}
+          referencia={delTraslado?.referencia ?? null}
           distancia={distancia}
           unidadesAcudiendo={enVivo?.unidadesAcudiendo ?? 1}
           ahora={ahora}
@@ -499,10 +534,13 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   )
 }
 
-/** "Estás a 3,2 km del lugar": lo que falta para llegar, dicho igual que en el resto de la pantalla. */
-function textoDeDistancia(metros: number) {
+/**
+ * "Estás a 3,2 km del lugar", o "del origen" en un traslado: lo que falta para llegar, dicho igual que en el resto de
+ * la pantalla.
+ */
+function textoDeDistancia(metros: number, adonde: 'lugar' | 'origen' | 'destino') {
   const { valor, unidad } = formatearDistancia(metros)
-  return `Estás a ${valor} ${unidad} del lugar`
+  return `Estás a ${valor} ${unidad} del ${adonde}`
 }
 
 /**
