@@ -28,7 +28,7 @@ function textosDelRetiro({ pasajero, motivo }: TrasladoRetirado) {
       const cual = pasajero ? `El traslado de ${pasajero}` : 'Este traslado'
       return {
         titulo: 'El traslado ya no está en curso',
-        mensaje: `${cual} ya no está en curso en tu unidad. Lo ves en Mis traslados si lo cerraron desde tu unidad.`,
+        mensaje: `${cual} ya no está en curso en tu unidad.`,
       }
     }
   }
