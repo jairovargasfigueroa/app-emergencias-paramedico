@@ -26,6 +26,7 @@ import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 import { MantenerPresionado } from '@/shared/ui/MantenerPresionado'
 import { PantallaDeEstado } from '@/shared/ui/PantallaDeEstado'
 
+import type { Atencion } from './api'
 import { atencionActivaQuery, centrosSaludQuery, entregarMutation, reconsultarTrasConflicto } from './queries'
 
 const OTRO_DESTINO = 'otro'
@@ -44,18 +45,8 @@ function volver() {
  * opcional y la descripción cubre destinos no catalogados: la entrega nunca se bloquea por el catálogo.
  */
 export function PantallaEntrega() {
-  const margenes = useSafeAreaInsets()
-  const tema = useTheme()
-  const queryClient = useQueryClient()
-  const toast = useToastController()
   const paramedico = useQuery(paramedicoGuardadoQuery()).data
   const atencion = useQuery({ ...atencionActivaQuery(paramedico?.id ?? 0), enabled: paramedico != null })
-  const centros = useQuery(centrosSaludQuery())
-  const entregar = useMutation(entregarMutation(queryClient))
-  const sinPosicion = usePosicionActual() === null
-
-  const [destino, setDestino] = useState<string>('')
-  const [descripcion, setDescripcion] = useState('')
 
   if (atencion.isPending) {
     return <PantallaDeEstado cargando />
@@ -76,9 +67,45 @@ export function PantallaEntrega() {
     )
   }
 
-  const actual = atencion.data
-  const atencionId = actual.id
-  const paramedicoId = paramedico.id
+  return <FormularioEntrega paramedicoId={paramedico.id} atencion={atencion.data} />
+}
+
+/** Arranca de la atención ya cargada: en un traslado, el destino viene elegido desde que se pidió. */
+function FormularioEntrega({ paramedicoId, atencion }: { paramedicoId: number; atencion: Atencion }) {
+  const margenes = useSafeAreaInsets()
+  const tema = useTheme()
+  const queryClient = useQueryClient()
+  const toast = useToastController()
+  const centros = useQuery(centrosSaludQuery())
+  const entregar = useMutation(entregarMutation(queryClient))
+  const sinPosicion = usePosicionActual() === null
+  const traslado = atencion.traslado
+  const centroDelTraslado = traslado?.centroSaludDestinoId ?? null
+
+  // Se puede cambiar si lo terminan dejando en otro lado. Sin centro, lo que se sabe del destino es el detalle que dejó
+  // quien pidió el traslado.
+  const [destino, setDestino] = useState(() =>
+    centroDelTraslado !== null ? String(centroDelTraslado) : traslado?.destinoDetalle ? OTRO_DESTINO : '',
+  )
+  const [descripcion, setDescripcion] = useState(() =>
+    centroDelTraslado === null ? (traslado?.destinoDetalle ?? '') : '',
+  )
+
+  const atencionId = atencion.id
+
+  // El centro del traslado se ve elegido aunque el catálogo todavía no haya llegado, o no lo traiga.
+  const faltaEnElCatalogo = centroDelTraslado !== null && !centros.data?.some((centro) => centro.id === centroDelTraslado)
+  const opciones = [
+    ...(faltaEnElCatalogo
+      ? [{ valor: String(centroDelTraslado), titulo: traslado?.centroSaludDestino ?? 'Destino del traslado', detalle: null }]
+      : []),
+    ...(centros.data ?? []).map((centro) => ({
+      valor: String(centro.id),
+      titulo: centro.nombre,
+      detalle: centro.direccion,
+    })),
+    { valor: OTRO_DESTINO, titulo: 'Otro destino', detalle: null },
+  ]
 
   /** Como en la atención: tras un 409 se vuelve a consultar, y si el traslado ya no es de la unidad lo dice su aviso. */
   function avisarError(error: unknown) {
@@ -87,7 +114,7 @@ export function PantallaEntrega() {
       mostrar()
       return
     }
-    void reconsultarTrasConflicto(queryClient, paramedicoId, actual).then((retirado) => {
+    void reconsultarTrasConflicto(queryClient, paramedicoId, atencion).then((retirado) => {
       if (!retirado) {
         mostrar()
       }
@@ -171,14 +198,7 @@ export function PantallaEntrega() {
             ) : null}
 
             <RadioGroup value={destino} onValueChange={setDestino} gap={10} aria-label="Destino de la entrega">
-              {[
-                ...(centros.data ?? []).map((centro) => ({
-                  valor: String(centro.id),
-                  titulo: centro.nombre,
-                  detalle: centro.direccion,
-                })),
-                { valor: OTRO_DESTINO, titulo: 'Otro destino', detalle: null },
-              ].map((opcion) => {
+              {opciones.map((opcion) => {
                 const elegido = destino === opcion.valor
                 const id = `destino-${opcion.valor}`
                 return (
