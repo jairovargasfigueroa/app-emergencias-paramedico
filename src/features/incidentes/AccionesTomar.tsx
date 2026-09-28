@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { router } from 'expo-router'
 import { useRef, useState } from 'react'
 import { Button, Paragraph, Spinner, useToastController } from 'tamagui'
 
@@ -42,9 +43,12 @@ export function AccionesTomar({ incidente }: { incidente: IncidenteAbierto }) {
     : null
   const puedeAcudir = servicio.data !== undefined && motivo === null
 
-  /** Sin aviso: la app entra directo a la pantalla de atención, que ya muestra a dónde va. */
+  /**
+   * Sin aviso: la app va directo a Inicio, donde está la atención en curso con a dónde va. No vuelve atrás: si el
+   * detalle se abrió desde un push estando en Traslados o Perfil, volver lo dejaría ahí.
+   */
   function alAcudir() {
-    volverAlMapa()
+    router.dismissTo('/')
   }
 
   /** PB-04 CA-05: desistir no registra nada y devuelve al mapa, en vez de dejarlo en el detalle. */
