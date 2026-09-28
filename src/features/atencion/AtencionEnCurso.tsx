@@ -19,7 +19,13 @@ import { useAhora } from '@/shared/reloj/useAhora'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 import { MantenerPresionado } from '@/shared/ui/MantenerPresionado'
 
-import { incidenteDeLaAtencion, type Atencion, type Movilidad, type MotivoCancelacion, type MotivoSinTraslado } from './api'
+import {
+  incidenteDeLaAtencion,
+  type Atencion,
+  type Movilidad,
+  type MotivoCancelacionPropio,
+  type MotivoSinTraslado,
+} from './api'
 import { DialogoCancelar } from './DialogoCancelar'
 import { DialogoUnidadNoCorresponde } from './DialogoUnidadNoCorresponde'
 import { PanelDeTraslado } from './PanelDeTraslado'
@@ -44,12 +50,11 @@ type Props = {
   atencion: Atencion
 }
 
-const MENSAJES_CANCELACION: Record<MotivoCancelacion, string> = {
+const MENSAJES_CANCELACION: Record<MotivoCancelacionPropio, string> = {
   AVERIA: 'Tu ambulancia quedó fuera de servicio.',
   NO_SE_ENCONTRO_PACIENTE: 'Tu ambulancia vuelve a estar disponible.',
   DESVIADA: 'Tu ambulancia vuelve a estar disponible.',
   RECHAZADA_POR_PARAMEDICO: 'El traslado vuelve a la cola y se le busca otra unidad.',
-  CANCELADA_POR_SOLICITANTE: 'Tu ambulancia vuelve a estar disponible.',
   OTRO: 'Tu ambulancia vuelve a estar disponible.',
 }
 
@@ -206,7 +211,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
     )
   }
 
-  function cancelar(motivo: MotivoCancelacion) {
+  function cancelar(motivo: MotivoCancelacionPropio) {
     cancelacion.mutate(
       { paramedicoId, atencionId: atencion.id, motivo },
       {

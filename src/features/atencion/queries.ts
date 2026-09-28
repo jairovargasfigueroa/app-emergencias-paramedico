@@ -7,7 +7,7 @@ import {
   type Atencion,
   type DatosPaciente,
   type Entrega,
-  type MotivoCancelacion,
+  type MotivoCancelacionPropio,
   type MotivoSinTraslado,
   type Movilidad,
   type Ubicacion,
@@ -134,7 +134,7 @@ export const entregarMutation = (queryClient: QueryClient) =>
 /** PB-05 R5: cancelación con motivo obligatorio. Con avería, la ambulancia queda fuera de servicio. */
 export const cancelarAtencionMutation = (queryClient: QueryClient) =>
   mutationOptions({
-    mutationFn: ({ paramedicoId, atencionId, motivo }: SobreAtencion & { motivo: MotivoCancelacion }) =>
+    mutationFn: ({ paramedicoId, atencionId, motivo }: SobreAtencion & { motivo: MotivoCancelacionPropio }) =>
       atencionApi.cancelar(atencionId, motivo),
     onSuccess: (atencion, { paramedicoId }) => aplicarAtencion(queryClient, paramedicoId, atencion),
   })

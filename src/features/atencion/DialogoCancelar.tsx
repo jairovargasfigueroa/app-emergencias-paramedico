@@ -5,14 +5,13 @@ import { Button, H2, Label, Paragraph, RadioGroup, Sheet, Spinner, Text, XStack,
 
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 
-import type { EstadoAtencion, MotivoCancelacion } from './api'
+import type { EstadoAtencion, MotivoCancelacionPropio } from './api'
 
-const MOTIVOS: Record<MotivoCancelacion, { titulo: string; detalle?: string }> = {
+const MOTIVOS: Record<MotivoCancelacionPropio, { titulo: string; detalle?: string }> = {
   AVERIA: { titulo: 'Avería', detalle: 'La ambulancia queda fuera de servicio' },
   NO_SE_ENCONTRO_PACIENTE: { titulo: 'No se encontró al paciente' },
   DESVIADA: { titulo: 'Desviada a otra emergencia' },
   RECHAZADA_POR_PARAMEDICO: { titulo: 'No puedo tomar este traslado', detalle: 'Se le busca otra unidad' },
-  CANCELADA_POR_SOLICITANTE: { titulo: 'Lo canceló quien lo pidió' },
   OTRO: { titulo: 'Otro motivo' },
 }
 
@@ -21,7 +20,7 @@ const MOTIVOS: Record<MotivoCancelacion, { titulo: string; detalle?: string }> =
  * muestra solo los que tienen sentido: antes de llegar no se sabe si está el paciente, frente a él no se lo deja por
  * otra emergencia y con el paciente a bordo no caben ni "no se encontró" ni "desviada".
  */
-const MOTIVOS_POR_ESTADO: Record<EstadoAtencion, MotivoCancelacion[]> = {
+const MOTIVOS_POR_ESTADO: Record<EstadoAtencion, MotivoCancelacionPropio[]> = {
   EN_CAMINO: ['AVERIA', 'DESVIADA', 'OTRO'],
   // Ya no se ofrece "no se encontró al paciente": eso es terminar sin trasladar, no cancelar.
   EN_EL_LUGAR: ['AVERIA', 'OTRO'],
@@ -37,7 +36,7 @@ const MOTIVOS_POR_ESTADO: Record<EstadoAtencion, MotivoCancelacion[]> = {
  * En un traslado, antes de salir, el paramédico puede devolverlo para que se le busque otra unidad. No aparece
  * una vez que llegó: a esa altura el pedido se resuelve o se termina sin traslado, no se devuelve.
  */
-function motivosDisponibles(estado: EstadoAtencion, esTraslado: boolean): MotivoCancelacion[] {
+function motivosDisponibles(estado: EstadoAtencion, esTraslado: boolean): MotivoCancelacionPropio[] {
   const base = MOTIVOS_POR_ESTADO[estado]
   return esTraslado && estado === 'EN_CAMINO' ? ['RECHAZADA_POR_PARAMEDICO', ...base] : base
 }
@@ -49,7 +48,7 @@ type Props = {
   /** En un traslado se puede devolver el pedido para que se le busque otra unidad. */
   esTraslado?: boolean
   enviando: boolean
-  onConfirmar: (motivo: MotivoCancelacion) => void
+  onConfirmar: (motivo: MotivoCancelacionPropio) => void
   onCerrar: () => void
 }
 
@@ -60,7 +59,7 @@ type Props = {
 export function DialogoCancelar({ abierto, estado, esTraslado = false, enviando, onConfirmar, onCerrar }: Props) {
   const margenes = useSafeAreaInsets()
   const tema = useTheme()
-  const [motivo, setMotivo] = useState<MotivoCancelacion | null>(null)
+  const [motivo, setMotivo] = useState<MotivoCancelacionPropio | null>(null)
 
   useEffect(() => {
     if (abierto) {
@@ -117,7 +116,7 @@ export function DialogoCancelar({ abierto, estado, esTraslado = false, enviando,
 
         <RadioGroup
           value={motivo ?? ''}
-          onValueChange={(valor) => setMotivo(valor as MotivoCancelacion)}
+          onValueChange={(valor) => setMotivo(valor as MotivoCancelacionPropio)}
           gap={8}
           aria-label="Motivo de cancelación"
         >
