@@ -23,11 +23,12 @@ function textosDelRetiro({ pasajero, motivo }: TrasladoRetirado) {
         mensaje: `Le pasaron ${elTraslado(pasajero)} a otra unidad. Tu unidad quedó libre.`,
       }
     default: {
-      // Sin push no se sabe cuál de las dos fue: se dicen las dos.
+      // Sin push no se sabe qué pasó: pudo cancelarse, pasarse a otra unidad o cerrarlo un compañero de turno desde
+      // su teléfono. Se dice solo lo cierto.
       const cual = pasajero ? `El traslado de ${pasajero}` : 'Este traslado'
       return {
-        titulo: 'Ya no tienes este traslado',
-        mensaje: `${cual} ya no está a tu cargo: lo cancelaron o se lo pasaron a otra unidad.`,
+        titulo: 'El traslado ya no está en curso',
+        mensaje: `${cual} ya no está en curso en tu unidad. Lo ves en Mis traslados si lo cerraron desde tu unidad.`,
       }
     }
   }
