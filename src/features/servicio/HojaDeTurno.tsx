@@ -47,15 +47,18 @@ export function HojaDeTurno({ abierta, placa, inicio, onCerrar }: Props) {
       .catch((error: unknown) => toast.show('No pudiste salir de turno', { message: mensajeDeError(error) }))
   }
 
-  /** Salir de la app deja de ser trabajar: si hay turno abierto, se cierra primero. */
+  /**
+   * Salir de la app deja de ser trabajar: si hay turno abierto, se cierra primero. Con la promesa, igual que al terminar
+   * el turno: con los callbacks de mutate, la hoja desaparecía antes de cerrar la sesión y la sesión quedaba abierta.
+   */
   function cerrarSesion() {
-    terminar.mutate(undefined, {
-      onSuccess: () => {
+    terminar
+      .mutateAsync()
+      .then(() => {
         onCerrar()
         void olvidarParamedico(queryClient)
-      },
-      onError: (error: unknown) => toast.show('No pudiste cerrar sesión', { message: mensajeDeError(error) }),
-    })
+      })
+      .catch((error: unknown) => toast.show('No pudiste cerrar sesión', { message: mensajeDeError(error) }))
   }
 
   return (
