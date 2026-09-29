@@ -147,10 +147,34 @@ function actualizarPorDespacho(datos: Record<string, unknown> | undefined, param
   return true
 }
 
+/**
+ * Lo que la central le hizo a la unidad sin que la tripulación lo pidiera: le cerró la atención, la sacó de servicio o
+ * la volvió a poner, o le cerró el turno a este paramédico. El push solo trae el aviso: lo demás se vuelve a pedir.
+ */
+const AVISOS_DE_LA_CENTRAL = [
+  'ATENCION_CANCELADA_POR_CENTRAL',
+  'ATENCION_ENTREGADA_POR_CENTRAL',
+  'UNIDAD_LIBERADA_POR_CENTRAL',
+  'FUERA_DE_SERVICIO',
+  'REACTIVADA',
+  'TURNO_CERRADO_POR_CENTRAL',
+]
+
+/** Devuelve si el push era un aviso de la central. */
+function actualizarPorAvisoDeLaCentral(datos: Record<string, unknown> | undefined, paramedicoId: number) {
+  if (typeof datos?.tipo !== 'string' || !AVISOS_DE_LA_CENTRAL.includes(datos.tipo)) {
+    return false
+  }
+  void queryClient.invalidateQueries({ queryKey: servicioKeys.actual(paramedicoId) })
+  void queryClient.invalidateQueries({ queryKey: atencionKeys.activa(paramedicoId) })
+  void queryClient.invalidateQueries({ queryKey: atencionKeys.misTraslados })
+  return true
+}
+
 /** Push que llega con la app abierta. El aviso lo muestra el sistema; acá se refresca lo que cambió. */
 export function recibirNotificacion(notificacion: Notification, paramedicoId: number) {
   const datos = notificacion.request.content.data
-  if (!actualizarPorDespacho(datos, paramedicoId)) {
+  if (!actualizarPorDespacho(datos, paramedicoId) && !actualizarPorAvisoDeLaCentral(datos, paramedicoId)) {
     actualizarPorTraslado(datos, paramedicoId)
   }
 }
@@ -160,7 +184,8 @@ const respuestasAtendidas = new Set<string>()
 /**
  * Al tocar el push, abre lo que el aviso trae: el incidente si es una emergencia nueva, para decidir si tomarla, o el
  * inicio si la central mandó a la unidad a una emergencia o si vino de un traslado, porque lo asignado se atiende desde
- * ahí igual que cualquier atención en curso. Si le sacaron el traslado, ahí mismo se ve el aviso de por qué.
+ * ahí igual que cualquier atención en curso. Si le sacaron el traslado, ahí mismo se ve el aviso de por qué. Un aviso de
+ * la central también lleva al inicio: ahí se ve cómo quedó la unidad.
  */
 export function abrirIncidenteDeNotificacion(respuesta: NotificationResponse, paramedicoId: number) {
   const identificador = respuesta.notification.request.identifier
@@ -170,7 +195,7 @@ export function abrirIncidenteDeNotificacion(respuesta: NotificationResponse, pa
   respuestasAtendidas.add(identificador)
   const datos = respuesta.notification.request.content.data
   // El despacho también trae el incidente, pero no hay nada que tomar: la unidad ya va para allá.
-  if (actualizarPorDespacho(datos, paramedicoId)) {
+  if (actualizarPorDespacho(datos, paramedicoId) || actualizarPorAvisoDeLaCentral(datos, paramedicoId)) {
     irAInicio()
     return
   }

@@ -6,10 +6,12 @@ import { useNotificaciones } from '@/features/notificaciones/useNotificaciones'
 import { useEnvioDePosicion } from '@/features/posicion/useEnvioDePosicion'
 
 import { servicioActualQuery } from './queries'
+import { useUnidadEnVivo } from './useUnidadEnVivo'
 
 /**
  * Lo que corre mientras hay un paramédico identificado, en cualquier pantalla: el envío de su posición mientras esté
- * en turno (PB-03 R4), las notificaciones push de incidentes nuevos (R3) y el aviso fijo de la atención en curso.
+ * en turno (PB-03 R4), las notificaciones push de incidentes nuevos (R3), el aviso fijo de la atención en curso y lo
+ * que otros le cambian a su unidad, que tiene que verse sin salir de la app.
  * Lo único que pinta es el aviso de una atención que la unidad ya no tiene, que tiene que verse esté donde esté.
  *
  * La posición va atada al turno y no a la asignación: fuera de su jornada, dónde está el paramédico no es asunto del
@@ -18,6 +20,7 @@ import { servicioActualQuery } from './queries'
 export function TareasEnServicio({ paramedicoId }: { paramedicoId: number }) {
   const servicio = useQuery(servicioActualQuery(paramedicoId))
   const enTurno = servicio.data?.turno != null
+  useUnidadEnVivo(paramedicoId)
   useEnvioDePosicion(paramedicoId, enTurno)
   useNotificaciones(paramedicoId)
   useAvisoDeAtencion(paramedicoId, enTurno)

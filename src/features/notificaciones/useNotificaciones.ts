@@ -10,8 +10,8 @@ import {
 
 /**
  * Registra el dispositivo, sigue los cambios de token y abre lo que trae un push cuando se lo toca. Con la app abierta,
- * un push de traslado o de despacho además refresca la atención: lo asignado aparece sin tener que tocarlo. Donde no
- * hay push (Expo Go para Android) no hace nada.
+ * un push de traslado, de despacho o un aviso de la central además refresca la unidad: el cambio aparece sin tener que
+ * tocarlo. Donde no hay push (Expo Go para Android) no hace nada.
  */
 export function useNotificaciones(paramedicoId: number) {
   useEffect(() => {

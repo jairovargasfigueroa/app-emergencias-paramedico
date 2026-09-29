@@ -38,6 +38,7 @@ import { DialogoSinTraslado } from './DialogoSinTraslado'
 import { HitosAtencion } from './HitosAtencion'
 import { MenuAtencion } from './MenuAtencion'
 import { TarjetaDeAtencion } from './TarjetaDeAtencion'
+import { AVISO_YA_LIBERADA } from './textos'
 import {
   cancelarAtencionMutation,
   cerrarSinTrasladoMutation,
@@ -209,6 +210,11 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   function liberar() {
     return liberacion
       .mutateAsync({ paramedicoId, atencionId: atencion.id })
+      .then((liberada) => {
+        if (liberada === null) {
+          toast.show(AVISO_YA_LIBERADA.titulo, { message: AVISO_YA_LIBERADA.mensaje })
+        }
+      })
       .catch(alFallar('No se pudo liberar la unidad'))
   }
 
