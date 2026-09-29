@@ -21,12 +21,13 @@ import {
 
 import { leerPosicionActual, usePosicionActual } from '@/features/posicion/posicionActual'
 import { paramedicoGuardadoQuery } from '@/features/servicio/queries'
-import { mensajeDeError } from '@/shared/api/cliente'
+import { ErrorApi, mensajeDeError } from '@/shared/api/cliente'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 import { MantenerPresionado } from '@/shared/ui/MantenerPresionado'
 import { PantallaDeEstado } from '@/shared/ui/PantallaDeEstado'
 
-import { atencionActivaQuery, centrosSaludQuery, entregarMutation } from './queries'
+import type { Atencion } from './api'
+import { atencionActivaQuery, centrosSaludQuery, entregarMutation, reconsultarTrasConflicto } from './queries'
 
 const OTRO_DESTINO = 'otro'
 const LARGO_MAXIMO_DESCRIPCION = 2000
@@ -44,18 +45,8 @@ function volver() {
  * opcional y la descripción cubre destinos no catalogados: la entrega nunca se bloquea por el catálogo.
  */
 export function PantallaEntrega() {
-  const margenes = useSafeAreaInsets()
-  const tema = useTheme()
-  const queryClient = useQueryClient()
-  const toast = useToastController()
   const paramedico = useQuery(paramedicoGuardadoQuery()).data
   const atencion = useQuery({ ...atencionActivaQuery(paramedico?.id ?? 0), enabled: paramedico != null })
-  const centros = useQuery(centrosSaludQuery())
-  const entregar = useMutation(entregarMutation(queryClient))
-  const sinPosicion = usePosicionActual() === null
-
-  const [destino, setDestino] = useState<string>('')
-  const [descripcion, setDescripcion] = useState('')
 
   if (atencion.isPending) {
     return <PantallaDeEstado cargando />
@@ -65,7 +56,7 @@ export function PantallaEntrega() {
     return (
       <PantallaDeEstado
         titulo="No hay un paciente por entregar"
-        descripcion="La entrega se marca después de llegar al centro de salud."
+        descripcion="La entrega se marca después de llegar al destino."
       >
         <BotonPrincipal onPress={volver}>
           <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
@@ -76,8 +67,59 @@ export function PantallaEntrega() {
     )
   }
 
-  const atencionId = atencion.data.id
-  const paramedicoId = paramedico.id
+  return <FormularioEntrega paramedicoId={paramedico.id} atencion={atencion.data} />
+}
+
+/** Arranca de la atención ya cargada: en un traslado, el destino viene elegido desde que se pidió. */
+function FormularioEntrega({ paramedicoId, atencion }: { paramedicoId: number; atencion: Atencion }) {
+  const margenes = useSafeAreaInsets()
+  const tema = useTheme()
+  const queryClient = useQueryClient()
+  const toast = useToastController()
+  const centros = useQuery(centrosSaludQuery())
+  const entregar = useMutation(entregarMutation(queryClient))
+  const sinPosicion = usePosicionActual() === null
+  const traslado = atencion.traslado
+  const centroDelTraslado = traslado?.centroSaludDestinoId ?? null
+
+  // Se puede cambiar si lo terminan dejando en otro lado. Sin centro, lo que se sabe del destino es el detalle que dejó
+  // quien pidió el traslado.
+  const [destino, setDestino] = useState(() =>
+    centroDelTraslado !== null ? String(centroDelTraslado) : traslado?.destinoDetalle ? OTRO_DESTINO : '',
+  )
+  const [descripcion, setDescripcion] = useState(() =>
+    centroDelTraslado === null ? (traslado?.destinoDetalle ?? '') : '',
+  )
+
+  const atencionId = atencion.id
+
+  // El centro del traslado se ve elegido aunque el catálogo todavía no haya llegado, o no lo traiga.
+  const faltaEnElCatalogo = centroDelTraslado !== null && !centros.data?.some((centro) => centro.id === centroDelTraslado)
+  const opciones = [
+    ...(faltaEnElCatalogo
+      ? [{ valor: String(centroDelTraslado), titulo: traslado?.centroSaludDestino ?? 'Destino del traslado', detalle: null }]
+      : []),
+    ...(centros.data ?? []).map((centro) => ({
+      valor: String(centro.id),
+      titulo: centro.nombre,
+      detalle: centro.direccion,
+    })),
+    { valor: OTRO_DESTINO, titulo: 'Otro destino', detalle: null },
+  ]
+
+  /** Como en la atención: tras un 409 se vuelve a consultar, y si ya no es de la unidad lo dice su aviso. */
+  function avisarError(error: unknown) {
+    const mostrar = () => toast.show('No se pudo marcar la entrega', { message: mensajeDeError(error) })
+    if (!(error instanceof ErrorApi && error.status === 409)) {
+      mostrar()
+      return
+    }
+    void reconsultarTrasConflicto(queryClient, paramedicoId, atencion).then((retirado) => {
+      if (!retirado) {
+        mostrar()
+      }
+    })
+  }
 
   function marcarEntrega() {
     const ubicacion = leerPosicionActual()
@@ -108,7 +150,7 @@ export function PantallaEntrega() {
         })
       })
       .catch((error: unknown) => {
-        toast.show('No se pudo marcar la entrega', { message: mensajeDeError(error) })
+        avisarError(error)
         // Se vuelve a lanzar para que el control se desbloquee y pueda reintentarse.
         throw error
       })
@@ -156,14 +198,7 @@ export function PantallaEntrega() {
             ) : null}
 
             <RadioGroup value={destino} onValueChange={setDestino} gap={10} aria-label="Destino de la entrega">
-              {[
-                ...(centros.data ?? []).map((centro) => ({
-                  valor: String(centro.id),
-                  titulo: centro.nombre,
-                  detalle: centro.direccion,
-                })),
-                { valor: OTRO_DESTINO, titulo: 'Otro destino', detalle: null },
-              ].map((opcion) => {
+              {opciones.map((opcion) => {
                 const elegido = destino === opcion.valor
                 const id = `destino-${opcion.valor}`
                 return (

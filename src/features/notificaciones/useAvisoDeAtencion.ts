@@ -1,8 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
-import type { EstadoAtencion } from '@/features/atencion/api'
-import { atencionActivaQuery } from '@/features/atencion/queries'
+import {
+  incidenteDeLaAtencion,
+  lugarDelTraslado,
+  puntoDelTraslado,
+  type EstadoAtencion,
+} from '@/features/atencion/api'
+import { atencionActivaQuery, direccionDelPuntoQuery } from '@/features/atencion/queries'
 import { useIncidentesAbiertos } from '@/features/incidentes/incidentesAbiertos'
 import { direccionIncidenteQuery } from '@/features/incidentes/queries'
 
@@ -18,13 +23,37 @@ function avisoDe(estado: EstadoAtencion, destino: string): Aviso | null {
     case 'EN_EL_LUGAR':
       return { titulo: `En el lugar · ${destino}`, cuerpo: 'Toca para volver y marcar al paciente a bordo' }
     case 'PACIENTE_RECOGIDO':
-      return { titulo: 'Paciente a bordo', cuerpo: 'Toca para volver y marcar la llegada al hospital' }
+      return { titulo: 'Paciente a bordo', cuerpo: 'Toca para volver y marcar la llegada al destino' }
     case 'EN_HOSPITAL':
-      return { titulo: 'En el centro de salud', cuerpo: 'Toca para volver y entregar al paciente' }
+      return { titulo: 'En el destino', cuerpo: 'Toca para volver y entregar al paciente' }
     case 'PACIENTE_ENTREGADO':
       return { titulo: 'Paciente entregado', cuerpo: 'Tu unidad sigue ocupada: toca para liberarla' }
     case 'SIN_TRASLADO':
       return { titulo: 'Atención terminada', cuerpo: 'Tu unidad sigue ocupada: toca para liberarla' }
+    default:
+      return null
+  }
+}
+
+/**
+ * Lo mismo en un traslado, que no es una emergencia: se dice con origen y destino. `lugar` es el punto al que va la
+ * unidad, el origen o el destino, si se sabe cómo nombrarlo.
+ */
+function avisoDeTraslado(estado: EstadoAtencion, lugar: string | null): Aviso | null {
+  const hacia = lugar ? ` · ${lugar}` : ''
+  switch (estado) {
+    case 'EN_CAMINO':
+      return { titulo: `En camino al origen${hacia}`, cuerpo: 'Toca para volver y marcar tu llegada' }
+    case 'EN_EL_LUGAR':
+      return { titulo: 'En el origen', cuerpo: 'Toca para volver y marcar al paciente a bordo' }
+    case 'PACIENTE_RECOGIDO':
+      return { titulo: `Paciente a bordo${hacia}`, cuerpo: 'Toca para volver y marcar la llegada al destino' }
+    case 'EN_HOSPITAL':
+      return { titulo: 'En el destino', cuerpo: 'Toca para volver y entregar al paciente' }
+    case 'PACIENTE_ENTREGADO':
+      return { titulo: 'Paciente entregado', cuerpo: 'Tu unidad sigue ocupada: toca para liberarla' }
+    case 'SIN_TRASLADO':
+      return { titulo: 'Traslado terminado', cuerpo: 'Tu unidad sigue ocupada: toca para liberarla' }
     default:
       return null
   }
@@ -35,14 +64,29 @@ export function useAvisoDeAtencion(paramedicoId: number, enTurno: boolean) {
   const atencion = useQuery({ ...atencionActivaQuery(paramedicoId), enabled: enTurno }).data
   const { incidentes } = useIncidentesAbiertos()
 
-  const incidente = atencion ? incidentes.find((abierto) => abierto.id === atencion.incidenteId) : undefined
+  // Si Firebase todavía no lo trajo, o ya lo retiró, la dirección sale de los datos que llegaron con la atención.
+  const incidente = atencion
+    ? (incidentes.find((abierto) => abierto.id === atencion.incidenteId) ?? incidenteDeLaAtencion(atencion))
+    : undefined
   const direccion = useQuery({
     // Con el incidente todavía sin llegar, comparte clave con la pantalla: si ya la resolvió, sale de la caché.
     ...direccionIncidenteQuery(incidente ?? { id: atencion?.incidenteId ?? 0, latitud: 0, longitud: 0 }),
     enabled: incidente !== undefined,
   }).data
+  // En un traslado, el punto al que va la unidad; también comparte clave con la pantalla. Un destino que es un centro
+  // de salud ya tiene nombre.
+  const punto = atencion ? puntoDelTraslado(atencion) : null
+  const conNombre = punto?.tipo === 'destino' && atencion?.traslado?.centroSaludDestino != null
+  const direccionDelPunto = useQuery({
+    ...direccionDelPuntoQuery(punto?.ubicacion ?? { latitud: 0, longitud: 0 }),
+    enabled: punto !== null && !conNombre,
+  }).data
 
-  const aviso = atencion ? avisoDe(atencion.estado, direccion ?? 'la emergencia') : null
+  const aviso = !atencion
+    ? null
+    : atencion.traslado && punto
+      ? avisoDeTraslado(atencion.estado, lugarDelTraslado(atencion.traslado, punto.tipo, direccionDelPunto).nombre)
+      : avisoDe(atencion.estado, direccion ?? 'la emergencia')
   const titulo = aviso?.titulo ?? null
   const cuerpo = aviso?.cuerpo ?? null
 

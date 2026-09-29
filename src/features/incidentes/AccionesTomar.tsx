@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { router } from 'expo-router'
 import { useRef, useState } from 'react'
 import { Button, Paragraph, Spinner, useToastController } from 'tamagui'
 
 import { paramedicoGuardadoQuery, servicioActualQuery } from '@/features/servicio/queries'
 import { mensajeDeError } from '@/shared/api/cliente'
+import { irAInicio } from '@/shared/navegacion/inicio'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 
 import { incidenteYaTomado, type IncidenteAbierto, type IncidenteYaTomado } from './api'
@@ -11,10 +13,17 @@ import { DialogoSumarse } from './DialogoSumarse'
 import { volverAlMapa } from './PantallaIncidente'
 import { sumarseAIncidenteMutation, tomarIncidenteMutation } from './queries'
 
-/** PB-04 R5: solo una ambulancia disponible y activa puede tomar o sumarse. Explica por qué no. */
-function motivoNoDisponible(enServicio: boolean, estado: string | undefined) {
+/**
+ * Solo acude una ambulancia disponible y activa, con el paramédico de turno. Estar asignado no alcanza: si el
+ * compañero está trabajando la unidad figura disponible, pero el que no abrió su turno no está trabajando. Explica
+ * por qué no.
+ */
+function motivoNoDisponible(enServicio: boolean, enTurno: boolean, estado: string | undefined) {
   if (!enServicio) {
     return 'No estás en servicio.'
+  }
+  if (!enTurno) {
+    return 'No estás de turno.'
   }
   if (estado === 'EN_ATENCION') {
     return 'Ya tienes una atención en curso.'
@@ -38,13 +47,19 @@ export function AccionesTomar({ incidente }: { incidente: IncidenteAbierto }) {
   const acudiendo = useRef(false)
 
   const motivo = servicio.data
-    ? motivoNoDisponible(servicio.data.enServicio, servicio.data.ambulancia?.estado)
+    ? motivoNoDisponible(servicio.data.enServicio, servicio.data.turno !== null, servicio.data.ambulancia?.estado)
     : null
   const puedeAcudir = servicio.data !== undefined && motivo === null
+  // Con una atención en curso no se acude a otra: lo que queda es volver a la suya.
+  const conAtencion =
+    servicio.data?.enServicio === true && servicio.data.turno !== null && servicio.data.ambulancia?.estado === 'EN_ATENCION'
 
-  /** Sin aviso: la app entra directo a la pantalla de atención, que ya muestra a dónde va. */
+  /**
+   * Sin aviso: la app va directo a Inicio, donde está la atención en curso con a dónde va. No vuelve atrás: si el
+   * detalle se abrió desde un push estando en Traslados o Perfil, volver lo dejaría ahí.
+   */
   function alAcudir() {
-    volverAlMapa()
+    router.dismissTo('/')
   }
 
   /** PB-04 CA-05: desistir no registra nada y devuelve al mapa, en vez de dejarlo en el detalle. */
@@ -104,16 +119,24 @@ export function AccionesTomar({ incidente }: { incidente: IncidenteAbierto }) {
           {motivo}
         </Paragraph>
       ) : null}
-      <BotonPrincipal
-        disabled={!puedeAcudir || tomar.isPending}
-        opacity={!puedeAcudir || tomar.isPending ? 0.6 : 1}
-        icon={tomar.isPending ? <Spinner color="$primarioTexto" /> : undefined}
-        onPress={tomarIncidente}
-      >
-        <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
-          {tomar.isPaused ? 'Esperando conexión…' : 'Voy a este incidente'}
-        </Button.Text>
-      </BotonPrincipal>
+      {conAtencion ? (
+        <BotonPrincipal onPress={irAInicio}>
+          <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
+            Ir a mi atención
+          </Button.Text>
+        </BotonPrincipal>
+      ) : (
+        <BotonPrincipal
+          disabled={!puedeAcudir || tomar.isPending}
+          opacity={!puedeAcudir || tomar.isPending ? 0.6 : 1}
+          icon={tomar.isPending ? <Spinner color="$primarioTexto" /> : undefined}
+          onPress={tomarIncidente}
+        >
+          <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
+            {tomar.isPaused ? 'Esperando conexión…' : 'Voy a este incidente'}
+          </Button.Text>
+        </BotonPrincipal>
+      )}
 
       <DialogoSumarse contexto={yaTomado} enviando={sumarse.isPending} onSumarse={sumarme} onDesistir={desistir} />
     </>

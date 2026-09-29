@@ -1,10 +1,11 @@
 import { mutationOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
 
+import { ErrorApi } from '@/shared/api/cliente'
 import { guardarSesion } from '@/shared/sesion/almacen'
 import { cerrarSesion, sesionKeys, sesionQuery } from '@/shared/sesion/queries'
 
 import { guardarAvisoDeServicioVisto, leerAvisoDeServicioVisto, type ParamedicoGuardado } from './almacen'
-import { servicioApi } from './api'
+import { servicioApi, type ServicioActual } from './api'
 
 export const servicioKeys = {
   actual: (paramedicoId: number) => ['servicio', paramedicoId] as const,
@@ -43,6 +44,18 @@ export const marcarAvisoDeServicioVistoMutation = (queryClient: QueryClient) =>
     },
   })
 
+/**
+ * Un 409 puede ser que lo mismo ya lo hizo otro: la central, o el compañero desde su teléfono. Se vuelve a pedir el
+ * servicio para ver cómo quedó de verdad. `null` si el error era otro.
+ */
+async function servicioTrasConflicto(queryClient: QueryClient, error: unknown): Promise<ServicioActual | null> {
+  if (!(error instanceof ErrorApi && error.status === 409)) {
+    return null
+  }
+  await queryClient.refetchQueries({ queryKey: ['servicio'] })
+  return queryClient.getQueriesData<ServicioActual>({ queryKey: ['servicio'] })[0]?.[1] ?? null
+}
+
 /** El turno se refleja en el servicio, así que al abrirlo o cerrarlo se vuelve a consultar todo de una vez. */
 export const iniciarTurnoMutation = (queryClient: QueryClient) =>
   mutationOptions({
@@ -50,9 +63,23 @@ export const iniciarTurnoMutation = (queryClient: QueryClient) =>
     onSuccess: (_turno, _variables, _contexto) => queryClient.invalidateQueries({ queryKey: ['servicio'] }),
   })
 
+/**
+ * Si la central ya le cerró el turno, el servidor rechaza cerrarlo de nuevo: no es un error, ya está hecho. En ese caso
+ * devuelve `null`.
+ */
 export const terminarTurnoMutation = (queryClient: QueryClient) =>
   mutationOptions({
-    mutationFn: () => servicioApi.terminarTurno(),
+    mutationFn: async () => {
+      try {
+        return await servicioApi.terminarTurno()
+      } catch (error) {
+        const servicio = await servicioTrasConflicto(queryClient, error)
+        if (servicio && !servicio.turno) {
+          return null
+        }
+        throw error
+      }
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['servicio'] }),
   })
 
@@ -69,10 +96,23 @@ export const identificarMutation = (queryClient: QueryClient) =>
     },
   })
 
-/** PB-05 CA-19: la ambulancia fuera de servicio por avería vuelve a DISPONIBLE. */
+/**
+ * PB-05 CA-19: la ambulancia fuera de servicio por avería vuelve a DISPONIBLE. Si ya la reactivó otro —la central, o el
+ * compañero desde su teléfono—, el servidor lo rechaza: no es un error, ya está hecho. En ese caso devuelve `null`.
+ */
 export const reactivarAmbulanciaMutation = (queryClient: QueryClient) =>
   mutationOptions({
-    mutationFn: (ambulanciaId: number) => servicioApi.reactivarAmbulancia(ambulanciaId),
+    mutationFn: async (ambulanciaId: number) => {
+      try {
+        return await servicioApi.reactivarAmbulancia(ambulanciaId)
+      } catch (error) {
+        const servicio = await servicioTrasConflicto(queryClient, error)
+        if (servicio?.ambulancia && servicio.ambulancia.estado !== 'FUERA_DE_SERVICIO') {
+          return null
+        }
+        throw error
+      }
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['servicio'] }),
   })
 

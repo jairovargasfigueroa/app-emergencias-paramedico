@@ -17,7 +17,7 @@ const HITOS_TRASLADO: Hito[] = [
   { estado: 'EN_CAMINO', titulo: 'En camino', hora: (a) => a.horaToma, textoHora: 'Tomado a las' },
   { estado: 'EN_EL_LUGAR', titulo: 'En el lugar', hora: (a) => a.horaLlegada, textoHora: 'Llegada a las' },
   { estado: 'PACIENTE_RECOGIDO', titulo: 'Paciente recogido', hora: (a) => a.horaRecogida, textoHora: 'Recogido a las' },
-  { estado: 'EN_HOSPITAL', titulo: 'En el hospital', hora: (a) => a.horaLlegadaHospital, textoHora: 'Llegada a las' },
+  { estado: 'EN_HOSPITAL', titulo: 'En el destino', hora: (a) => a.horaLlegadaHospital, textoHora: 'Llegada a las' },
   { estado: 'PACIENTE_ENTREGADO', titulo: 'Paciente entregado', hora: (a) => a.horaEntrega, textoHora: 'Entregado a las' },
 ]
 
@@ -29,11 +29,22 @@ const HITOS_SIN_TRASLADO: Hito[] = [
 ]
 
 /**
+ * En un traslado programado los mismos hitos se dicen con origen y destino, y la toma es una asignación: el viaje no
+ * se eligió, lo mandó la central.
+ */
+const EN_UN_TRASLADO: Partial<Record<EstadoAtencion, Pick<Hito, 'titulo' | 'textoHora'>>> = {
+  EN_CAMINO: { titulo: 'En camino al origen', textoHora: 'Asignado a las' },
+  EN_EL_LUGAR: { titulo: 'En el origen', textoHora: 'Llegada a las' },
+  PACIENTE_RECOGIDO: { titulo: 'Paciente a bordo', textoHora: 'A bordo a las' },
+}
+
+/**
  * Línea de tiempo de la atención: hitos cumplidos con su hora, el siguiente paso y los que faltan. Va plegada detrás
  * de "Ver detalles": mientras se conduce, el centro de la pantalla es para el hito que toca marcar.
  */
 export function HitosAtencion({ atencion }: { atencion: Atencion }) {
-  const hitos = atencion.estado === 'SIN_TRASLADO' ? HITOS_SIN_TRASLADO : HITOS_TRASLADO
+  const base = atencion.estado === 'SIN_TRASLADO' ? HITOS_SIN_TRASLADO : HITOS_TRASLADO
+  const hitos = atencion.traslado ? base.map((hito) => ({ ...hito, ...EN_UN_TRASLADO[hito.estado] })) : base
   const actual = hitos.findIndex((hito) => hito.estado === atencion.estado)
 
   return (

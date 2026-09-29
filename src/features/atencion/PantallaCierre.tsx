@@ -1,8 +1,9 @@
 import Feather from '@expo/vector-icons/Feather'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { router, useLocalSearchParams } from 'expo-router'
+import { useEffect, useRef } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Button, H1, Paragraph, Spinner, Text, XStack, YStack, useToastController } from 'tamagui'
+import { Button, H1, Paragraph, Spinner, Text, XStack, YStack, useTheme, useToastController } from 'tamagui'
 
 import { paramedicoGuardadoQuery } from '@/features/servicio/queries'
 import { mensajeDeError } from '@/shared/api/cliente'
@@ -10,12 +11,21 @@ import { horaCorta } from '@/shared/formato/tiempo'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 
 import { atencionActivaQuery, liberarMutation } from './queries'
+import { AVISO_YA_LIBERADA } from './textos'
 
 type Tiempos = {
   llegada: string
   recogida: string
   hospital: string
   entrega: string
+}
+
+function volver() {
+  if (router.canGoBack()) {
+    router.back()
+  } else {
+    router.replace('/')
+  }
 }
 
 /**
@@ -25,12 +35,25 @@ type Tiempos = {
  */
 export function PantallaCierre() {
   const margenes = useSafeAreaInsets()
+  const tema = useTheme()
   const tiempos = useLocalSearchParams<Tiempos>()
   const queryClient = useQueryClient()
   const toast = useToastController()
   const paramedico = useQuery(paramedicoGuardadoQuery()).data
   const atencion = useQuery({ ...atencionActivaQuery(paramedico?.id ?? 0), enabled: paramedico != null }).data
   const liberacion = useMutation(liberarMutation(queryClient))
+
+  // Si la liberó otro con esta pantalla abierta —la central, o el compañero desde su teléfono—, acá ya no queda nada
+  // que hacer: se vuelve a Inicio y se dice por qué.
+  const liberadaPorOtro = atencion === null && liberacion.isIdle
+  const avisada = useRef(false)
+  useEffect(() => {
+    if (liberadaPorOtro && !avisada.current) {
+      avisada.current = true
+      toast.show(AVISO_YA_LIBERADA.titulo, { message: AVISO_YA_LIBERADA.mensaje })
+      router.dismissTo('/')
+    }
+  }, [liberadaPorOtro, toast])
 
   function liberar() {
     // Si ya no hay atención ocupando la unidad, alguien la liberó antes: no hay nada que hacer más que volver.
@@ -41,7 +64,12 @@ export function PantallaCierre() {
     liberacion.mutate(
       { paramedicoId: paramedico.id, atencionId: atencion.id },
       {
-        onSuccess: () => router.dismissTo('/'),
+        onSuccess: (liberada) => {
+          if (liberada === null) {
+            toast.show(AVISO_YA_LIBERADA.titulo, { message: AVISO_YA_LIBERADA.mensaje })
+          }
+          router.dismissTo('/')
+        },
         onError: (error: unknown) =>
           toast.show('No se pudo liberar la unidad', { message: mensajeDeError(error) }),
       },
@@ -49,53 +77,63 @@ export function PantallaCierre() {
   }
 
   return (
-    <YStack
-      flex={1}
-      bg="$superficie"
-      items="center"
-      justify="center"
-      gap={18}
-      px={24}
-      pt={margenes.top + 24}
-      pb={margenes.bottom + 24}
-    >
-      <YStack width={64} height={64} rounded={999} bg="$disponible" items="center" justify="center">
-        <Feather name="check" size={32} color="#FFFFFF" />
+    <YStack flex={1} bg="$superficie" pt={margenes.top + 8} pb={margenes.bottom + 24}>
+      <XStack px={20}>
+        <Button
+          width={48}
+          height={48}
+          p={0}
+          rounded={999}
+          bg="$superficie"
+          borderColor="$borde"
+          aria-label="Volver"
+          onPress={volver}
+        >
+          <Feather name="chevron-left" size={24} color={tema.texto?.val} />
+        </Button>
+      </XStack>
+
+      <YStack flex={1} items="center" justify="center" gap={18} px={24}>
+        <YStack width={64} height={64} rounded={999} bg="$disponible" items="center" justify="center">
+          <Feather name="check" size={32} color="#FFFFFF" />
+        </YStack>
+
+        <H1 color="$texto" fontSize={26} lineHeight={32} fontWeight="600" text="center">
+          Paciente entregado
+        </H1>
+
+        <YStack self="stretch" gap={10} py={16} borderTopWidth={1} borderBottomWidth={1} borderColor="$borde">
+          <Tiempo etiqueta="Llegada" hora={tiempos.llegada} />
+          <Tiempo etiqueta="Paciente a bordo" hora={tiempos.recogida} />
+          <Tiempo etiqueta="Llegada al destino" hora={tiempos.hospital} />
+          <Tiempo etiqueta="Entrega" hora={tiempos.entrega} />
+        </YStack>
+
+        <Paragraph color="$textoSecundario" fontSize={16} lineHeight={24} text="center">
+          {atencion?.traslado
+            ? 'Tu unidad sigue ocupada. Libérala cuando estés listo para volver a salir.'
+            : 'Tu unidad sigue ocupada. Libérala cuando estés listo para otra emergencia.'}
+        </Paragraph>
+
+        <BotonPrincipal
+          self="stretch"
+          disabled={liberacion.isPending}
+          opacity={liberacion.isPending ? 0.6 : 1}
+          icon={liberacion.isPending ? <Spinner color="$primarioTexto" /> : undefined}
+          onPress={liberar}
+        >
+          <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
+            Ya estoy disponible
+          </Button.Text>
+        </BotonPrincipal>
+
+        {/* Todavía con papeleo o limpieza: se vuelve al mapa y la unidad se libera desde ahí. */}
+        <Button self="stretch" height={48} rounded={14} chromeless onPress={() => router.dismissTo('/')}>
+          <Button.Text color="$texto" fontSize={15} fontWeight="500">
+            Ahora no
+          </Button.Text>
+        </Button>
       </YStack>
-
-      <H1 color="$texto" fontSize={26} lineHeight={32} fontWeight="600" text="center">
-        Paciente entregado
-      </H1>
-
-      <YStack self="stretch" gap={10} py={16} borderTopWidth={1} borderBottomWidth={1} borderColor="$borde">
-        <Tiempo etiqueta="Llegada" hora={tiempos.llegada} />
-        <Tiempo etiqueta="Paciente a bordo" hora={tiempos.recogida} />
-        <Tiempo etiqueta="Llegada al hospital" hora={tiempos.hospital} />
-        <Tiempo etiqueta="Entrega" hora={tiempos.entrega} />
-      </YStack>
-
-      <Paragraph color="$textoSecundario" fontSize={16} lineHeight={24} text="center">
-        Tu unidad sigue ocupada. Liberala cuando estés listo para otra emergencia.
-      </Paragraph>
-
-      <BotonPrincipal
-        self="stretch"
-        disabled={liberacion.isPending}
-        opacity={liberacion.isPending ? 0.6 : 1}
-        icon={liberacion.isPending ? <Spinner color="$primarioTexto" /> : undefined}
-        onPress={liberar}
-      >
-        <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
-          Ya estoy disponible
-        </Button.Text>
-      </BotonPrincipal>
-
-      {/* Todavía con papeleo o limpieza: se vuelve al mapa y la unidad se libera desde ahí. */}
-      <Button self="stretch" height={48} rounded={14} chromeless onPress={() => router.dismissTo('/')}>
-        <Button.Text color="$texto" fontSize={15} fontWeight="500">
-          Ahora no
-        </Button.Text>
-      </Button>
     </YStack>
   )
 }

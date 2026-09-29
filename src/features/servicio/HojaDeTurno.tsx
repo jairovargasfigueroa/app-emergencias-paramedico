@@ -30,23 +30,35 @@ export function HojaDeTurno({ abierta, placa, inicio, onCerrar }: Props) {
   const aviso = avisoDeUbicacion(useEstadoUbicacion())
   const terminar = useMutation(terminarTurnoMutation(queryClient))
 
-  /** El backend rechaza salir con una atención en curso: el motivo se muestra tal cual lo manda. */
+  /**
+   * El backend rechaza salir con una atención en curso: el motivo se muestra tal cual lo manda. Con la promesa y no con
+   * los callbacks de mutate: sin turno, el mapa y esta hoja desaparecen, y TanStack Query no llama esos callbacks si el
+   * componente ya no está.
+   */
   function terminarTurno() {
-    terminar.mutate(undefined, {
-      onSuccess: () => onCerrar(),
-      onError: (error: unknown) => toast.show('No pudiste salir de turno', { message: mensajeDeError(error) }),
-    })
+    terminar
+      .mutateAsync()
+      .then((turno) => {
+        if (turno === null) {
+          toast.show('Tu turno ya estaba cerrado', { message: 'Lo cerró la central.' })
+        }
+        onCerrar()
+      })
+      .catch((error: unknown) => toast.show('No pudiste salir de turno', { message: mensajeDeError(error) }))
   }
 
-  /** Salir de la app deja de ser trabajar: si hay turno abierto, se cierra primero. */
+  /**
+   * Salir de la app deja de ser trabajar: si hay turno abierto, se cierra primero. Con la promesa, igual que al terminar
+   * el turno: con los callbacks de mutate, la hoja desaparecía antes de cerrar la sesión y la sesión quedaba abierta.
+   */
   function cerrarSesion() {
-    terminar.mutate(undefined, {
-      onSuccess: () => {
+    terminar
+      .mutateAsync()
+      .then(() => {
         onCerrar()
         void olvidarParamedico(queryClient)
-      },
-      onError: (error: unknown) => toast.show('No pudiste cerrar sesión', { message: mensajeDeError(error) }),
-    })
+      })
+      .catch((error: unknown) => toast.show('No pudiste cerrar sesión', { message: mensajeDeError(error) }))
   }
 
   return (
@@ -110,7 +122,7 @@ export function HojaDeTurno({ abierta, placa, inicio, onCerrar }: Props) {
         ) : null}
 
         <Paragraph color="$textoSecundario" fontSize={15} lineHeight={22}>
-          Al salir dejás de compartir tu ubicación y tu unidad queda sin turno, así que nadie va a contar con ella
+          Al salir dejas de compartir tu ubicación y tu unidad queda sin turno, así que nadie va a contar con ella
           hasta que entre alguien.
         </Paragraph>
 

@@ -9,37 +9,44 @@ import type { Atencion } from './api'
 
 type Props = {
   atencion: Atencion
-  /** Dirección del incidente: es lo que el paramédico le lee al conductor, que no tiene la app. */
+  /** Dirección del lugar al que va: es lo que el paramédico le lee al conductor, que no tiene la app. */
   lugar: string
+  /** En un traslado, lo que ayuda a encontrar el lugar: la referencia del origen o el área del destino. */
+  referencia: string | null
   distancia: Distancia | null
   unidadesAcudiendo: number
   ahora: number
 }
 
-/** Tarjeta superior de la atención en curso. En camino manda la dirección; después, desde cuándo va cada hito. */
-export function TarjetaDeAtencion({ atencion, lugar, distancia, unidadesAcudiendo, ahora }: Props) {
-  const enCamino = atencion.estado === 'EN_CAMINO'
+/**
+ * Tarjeta superior de la atención en curso. En camino manda la dirección; después, desde cuándo va cada hito. En un
+ * traslado se va dos veces a un lugar conocido: al origen a buscar al paciente y, con él a bordo, al destino.
+ */
+export function TarjetaDeAtencion({ atencion, lugar, referencia, distancia, unidadesAcudiendo, ahora }: Props) {
+  const esTraslado = atencion.traslado !== null
   const enElLugar = atencion.estado === 'EN_EL_LUGAR'
+  const deCamino = atencion.estado === 'EN_CAMINO' || (esTraslado && atencion.estado === 'PACIENTE_RECOGIDO')
 
   // Un switch y no una cadena de ternarios: así agregar un estado obliga a decidir qué dice la tarjeta.
   const { encabezado, titulo } = ((): { encabezado: string; titulo: string } => {
     switch (atencion.estado) {
       case 'EN_CAMINO':
-        return { encabezado: 'Vas a', titulo: lugar }
+        return { encabezado: esTraslado ? 'Vas al origen' : 'Vas a', titulo: lugar }
       case 'EN_EL_LUGAR':
         return {
-          encabezado: `Atención en curso · ${atencion.placa}`,
-          titulo: `En el lugar desde las ${horaCorta(atencion.horaLlegada ?? atencion.horaToma)}`,
+          encabezado: `${esTraslado ? 'Traslado' : 'Atención'} en curso · ${atencion.placa}`,
+          titulo: `${esTraslado ? 'En el origen' : 'En el lugar'} desde las ${horaCorta(atencion.horaLlegada ?? atencion.horaToma)}`,
         }
       case 'PACIENTE_RECOGIDO':
         return {
           encabezado: `Paciente a bordo desde las ${horaCorta(atencion.horaRecogida ?? atencion.horaToma)} · ${atencion.placa}`,
-          titulo: 'En traslado',
+          // En un traslado el destino se conoce desde antes de salir: se dice cuál es.
+          titulo: esTraslado ? lugar : 'En traslado',
         }
       case 'EN_HOSPITAL':
         return {
           encabezado: `Llegaste a las ${horaCorta(atencion.horaLlegadaHospital ?? atencion.horaToma)} · ${atencion.placa}`,
-          titulo: 'En el centro de salud',
+          titulo: 'En el destino',
         }
       case 'SIN_TRASLADO':
         return { encabezado: `Atención terminada · ${atencion.placa}`, titulo: 'Sin traslado' }
@@ -48,6 +55,13 @@ export function TarjetaDeAtencion({ atencion, lugar, distancia, unidadesAcudiend
         return { encabezado: `Atención terminada · ${atencion.placa}`, titulo: 'Paciente entregado' }
     }
   })()
+
+  // Debajo del lugar, mientras se va hacia él: cuánto falta y, en una emergencia, quién más va; en un traslado, lo que
+  // ayuda a dar con la puerta.
+  const aDistancia = distancia ? `a ${distancia.valor} ${distancia.unidad}` : null
+  const detalle = esTraslado
+    ? [aDistancia, referencia].filter(Boolean).join(' · ')
+    : [aDistancia, textoOtrasUnidades(unidadesAcudiendo)].filter(Boolean).join(' · ')
 
   return (
     <XStack
@@ -68,14 +82,12 @@ export function TarjetaDeAtencion({ atencion, lugar, distancia, unidadesAcudiend
         <Text color="$textoSecundario" fontSize={14} numberOfLines={1}>
           {encabezado}
         </Text>
-        <Text color="$texto" fontSize={enCamino ? 21 : 18} lineHeight={enCamino ? 26 : 24} fontWeight="600" numberOfLines={2}>
+        <Text color="$texto" fontSize={deCamino ? 21 : 18} lineHeight={deCamino ? 26 : 24} fontWeight="600" numberOfLines={2}>
           {titulo}
         </Text>
-        {enCamino ? (
+        {deCamino && detalle ? (
           <Text color="$textoSecundario" fontSize={14} numberOfLines={1}>
-            {distancia
-              ? `a ${distancia.valor} ${distancia.unidad} · ${textoOtrasUnidades(unidadesAcudiendo)}`
-              : textoOtrasUnidades(unidadesAcudiendo)}
+            {detalle}
           </Text>
         ) : null}
       </YStack>
