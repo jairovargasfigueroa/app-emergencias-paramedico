@@ -2,6 +2,7 @@ import { mutationOptions, queryOptions, type QueryClient } from '@tanstack/react
 
 import { direccionAproximada } from '@/features/incidentes/direcciones'
 import { servicioKeys } from '@/features/servicio/queries'
+import { ErrorApi } from '@/shared/api/cliente'
 import { irAInicio } from '@/shared/navegacion/inicio'
 
 import {
@@ -151,13 +152,47 @@ export const cerrarSinTrasladoMutation = (queryClient: QueryClient) =>
     },
   })
 
-/** La unidad termina de entregar, limpia y queda libre. Recién acá puede recibir otra emergencia. */
+/**
+ * Un 409 al liberar puede ser que ya la liberó otro. Se vuelve a pedir la atención: si la que ocupa la unidad ya no es
+ * esa, está hecho.
+ */
+async function yaNoOcupaLaUnidad(queryClient: QueryClient, paramedicoId: number, atencionId: number, error: unknown) {
+  if (!(error instanceof ErrorApi && error.status === 409)) {
+    return false
+  }
+  try {
+    const vigente = await queryClient.fetchQuery({ ...atencionActivaQuery(paramedicoId), staleTime: 0 })
+    return vigente?.id !== atencionId
+  } catch {
+    return false
+  }
+}
+
+/**
+ * La unidad termina de entregar, limpia y queda libre. Recién acá puede recibir otra emergencia. Si ya la liberó otro
+ * —la central, o el compañero desde su teléfono—, el servidor lo rechaza: no es un error, ya está hecho. En ese caso
+ * devuelve `null`.
+ */
 export const liberarMutation = (queryClient: QueryClient) =>
   mutationOptions({
-    mutationFn: ({ atencionId }: SobreAtencion) => atencionApi.liberar(atencionId),
+    mutationFn: async ({ paramedicoId, atencionId }: SobreAtencion) => {
+      try {
+        return await atencionApi.liberar(atencionId)
+      } catch (error) {
+        if (await yaNoOcupaLaUnidad(queryClient, paramedicoId, atencionId, error)) {
+          return null
+        }
+        throw error
+      }
+    },
     onSuccess: (atencion, { paramedicoId }) => {
-      aplicarAtencion(queryClient, paramedicoId, atencion)
-      refrescarMisTraslados(queryClient, atencion)
+      if (atencion) {
+        aplicarAtencion(queryClient, paramedicoId, atencion)
+        refrescarMisTraslados(queryClient, atencion)
+        return
+      }
+      // La consulta de recién ya dejó al día la atención y la unidad: falta el historial.
+      void queryClient.invalidateQueries({ queryKey: atencionKeys.misTraslados })
     },
   })
 

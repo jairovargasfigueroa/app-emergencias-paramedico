@@ -37,7 +37,12 @@ export function AvisoFueraDeServicio({ ambulanciaId }: { ambulanciaId: number })
         icon={reactivar.isPending ? <Spinner size="small" color="$primarioTexto" /> : undefined}
         onPress={() =>
           reactivar.mutate(ambulanciaId, {
-            onSuccess: () => toast.show('Ambulancia disponible', { message: 'Ya puedes tomar incidentes.' }),
+            onSuccess: (ambulancia) =>
+              ambulancia
+                ? toast.show('Ambulancia disponible', { message: 'Ya puedes tomar incidentes.' })
+                : toast.show('Tu ambulancia ya estaba en servicio', {
+                    message: 'La reactivó la central o tu compañero de turno.',
+                  }),
             onError: (error) => toast.show('No se pudo reactivar', { message: mensajeDeError(error) }),
           })
         }

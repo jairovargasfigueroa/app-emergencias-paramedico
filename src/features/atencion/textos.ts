@@ -61,3 +61,9 @@ export const TEXTO_MOTIVO_CANCELACION: Record<MotivoCancelacion, string> = {
   CERRADA_POR_CENTRAL: 'La cerró la central',
   OTRO: 'Otro motivo',
 }
+
+/** Al liberar una unidad que ya liberó otro: no es un error, y se dice quién pudo haber sido. */
+export const AVISO_YA_LIBERADA = {
+  titulo: 'Tu unidad ya estaba liberada',
+  mensaje: 'La liberó la central o tu compañero de turno.',
+}

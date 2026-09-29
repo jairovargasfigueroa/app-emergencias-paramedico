@@ -27,7 +27,10 @@ export function PantallaPerfil() {
       return
     }
     terminar.mutate(undefined, {
-      onSuccess: () => toast.show('Turno terminado'),
+      onSuccess: (turno) =>
+        turno === null
+          ? toast.show('Tu turno ya estaba cerrado', { message: 'Lo cerró la central.' })
+          : toast.show('Turno terminado'),
       // El backend rechaza salir con una atención en curso: el motivo se muestra tal cual lo manda.
       onError: (error) => toast.show('No pudiste salir de turno', { message: mensajeDeError(error) }),
     })

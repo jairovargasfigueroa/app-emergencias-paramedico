@@ -33,7 +33,12 @@ export function HojaDeTurno({ abierta, placa, inicio, onCerrar }: Props) {
   /** El backend rechaza salir con una atención en curso: el motivo se muestra tal cual lo manda. */
   function terminarTurno() {
     terminar.mutate(undefined, {
-      onSuccess: () => onCerrar(),
+      onSuccess: (turno) => {
+        if (turno === null) {
+          toast.show('Tu turno ya estaba cerrado', { message: 'Lo cerró la central.' })
+        }
+        onCerrar()
+      },
       onError: (error: unknown) => toast.show('No pudiste salir de turno', { message: mensajeDeError(error) }),
     })
   }

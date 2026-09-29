@@ -1,6 +1,7 @@
 import Feather from '@expo/vector-icons/Feather'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { router, useLocalSearchParams } from 'expo-router'
+import { useEffect, useRef } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button, H1, Paragraph, Spinner, Text, XStack, YStack, useTheme, useToastController } from 'tamagui'
 
@@ -10,6 +11,7 @@ import { horaCorta } from '@/shared/formato/tiempo'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 
 import { atencionActivaQuery, liberarMutation } from './queries'
+import { AVISO_YA_LIBERADA } from './textos'
 
 type Tiempos = {
   llegada: string
@@ -41,6 +43,18 @@ export function PantallaCierre() {
   const atencion = useQuery({ ...atencionActivaQuery(paramedico?.id ?? 0), enabled: paramedico != null }).data
   const liberacion = useMutation(liberarMutation(queryClient))
 
+  // Si la liberó otro con esta pantalla abierta —la central, o el compañero desde su teléfono—, acá ya no queda nada
+  // que hacer: se vuelve a Inicio y se dice por qué.
+  const liberadaPorOtro = atencion === null && liberacion.isIdle
+  const avisada = useRef(false)
+  useEffect(() => {
+    if (liberadaPorOtro && !avisada.current) {
+      avisada.current = true
+      toast.show(AVISO_YA_LIBERADA.titulo, { message: AVISO_YA_LIBERADA.mensaje })
+      router.dismissTo('/')
+    }
+  }, [liberadaPorOtro, toast])
+
   function liberar() {
     // Si ya no hay atención ocupando la unidad, alguien la liberó antes: no hay nada que hacer más que volver.
     if (!paramedico || !atencion) {
@@ -50,7 +64,12 @@ export function PantallaCierre() {
     liberacion.mutate(
       { paramedicoId: paramedico.id, atencionId: atencion.id },
       {
-        onSuccess: () => router.dismissTo('/'),
+        onSuccess: (liberada) => {
+          if (liberada === null) {
+            toast.show(AVISO_YA_LIBERADA.titulo, { message: AVISO_YA_LIBERADA.mensaje })
+          }
+          router.dismissTo('/')
+        },
         onError: (error: unknown) =>
           toast.show('No se pudo liberar la unidad', { message: mensajeDeError(error) }),
       },
