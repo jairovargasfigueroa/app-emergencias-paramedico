@@ -35,16 +35,19 @@ export function AvisoFueraDeServicio({ ambulanciaId }: { ambulanciaId: number })
         pressStyle={{ bg: '$primarioPresionado' }}
         disabled={reactivar.isPending}
         icon={reactivar.isPending ? <Spinner size="small" color="$primarioTexto" /> : undefined}
+        // Con la promesa y no con los callbacks de mutate: al quedar en servicio esta tarjeta desaparece, y TanStack Query
+        // no llama esos callbacks si el componente ya no está.
         onPress={() =>
-          reactivar.mutate(ambulanciaId, {
-            onSuccess: (ambulancia) =>
+          reactivar
+            .mutateAsync(ambulanciaId)
+            .then((ambulancia) =>
               ambulancia
                 ? toast.show('Ambulancia disponible', { message: 'Ya puedes tomar incidentes.' })
                 : toast.show('Tu ambulancia ya estaba en servicio', {
                     message: 'La reactivó la central o tu compañero de turno.',
                   }),
-            onError: (error) => toast.show('No se pudo reactivar', { message: mensajeDeError(error) }),
-          })
+            )
+            .catch((error: unknown) => toast.show('No se pudo reactivar', { message: mensajeDeError(error) }))
         }
       >
         <Button.Text color="$primarioTexto" fontSize={14} fontWeight="600">

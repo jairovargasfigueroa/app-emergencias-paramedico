@@ -30,17 +30,21 @@ export function HojaDeTurno({ abierta, placa, inicio, onCerrar }: Props) {
   const aviso = avisoDeUbicacion(useEstadoUbicacion())
   const terminar = useMutation(terminarTurnoMutation(queryClient))
 
-  /** El backend rechaza salir con una atención en curso: el motivo se muestra tal cual lo manda. */
+  /**
+   * El backend rechaza salir con una atención en curso: el motivo se muestra tal cual lo manda. Con la promesa y no con
+   * los callbacks de mutate: sin turno, el mapa y esta hoja desaparecen, y TanStack Query no llama esos callbacks si el
+   * componente ya no está.
+   */
   function terminarTurno() {
-    terminar.mutate(undefined, {
-      onSuccess: (turno) => {
+    terminar
+      .mutateAsync()
+      .then((turno) => {
         if (turno === null) {
           toast.show('Tu turno ya estaba cerrado', { message: 'Lo cerró la central.' })
         }
         onCerrar()
-      },
-      onError: (error: unknown) => toast.show('No pudiste salir de turno', { message: mensajeDeError(error) }),
-    })
+      })
+      .catch((error: unknown) => toast.show('No pudiste salir de turno', { message: mensajeDeError(error) }))
   }
 
   /** Salir de la app deja de ser trabajar: si hay turno abierto, se cierra primero. */
