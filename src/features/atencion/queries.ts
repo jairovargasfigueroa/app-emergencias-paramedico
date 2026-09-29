@@ -2,6 +2,7 @@ import { mutationOptions, queryOptions, type QueryClient } from '@tanstack/react
 
 import { direccionAproximada } from '@/features/incidentes/direcciones'
 import { servicioKeys } from '@/features/servicio/queries'
+import { irAInicio } from '@/shared/navegacion/inicio'
 
 import {
   atencionApi,
@@ -43,10 +44,17 @@ export const atencionActivaQuery = (paramedicoId: number) =>
       // desde la app, eso ya está guardado y no hay nada que avisar.
       const antes = client.getQueryData<Atencion | null>(queryKey)
       avisarSiSeRetiroLaAtencion(antes, activa)
-      // Si la cerró alguien más, cambió también la unidad: quedó disponible, o fuera de servicio si así la dejó la
-      // central. Lo que cierra la tripulación ya vuelve a pedir el servicio al guardar la respuesta.
-      if (antes && activa?.id !== antes.id) {
+      // Si la cambió alguien más, cambió también la unidad: quedó disponible, fuera de servicio si así la dejó la
+      // central, u ocupada con otra atención. Lo que hace la tripulación ya vuelve a pedir el servicio al guardar la
+      // respuesta.
+      if (antes !== undefined && activa?.id !== antes?.id) {
         void client.invalidateQueries({ queryKey: servicioKeys.actual(paramedicoId) })
+      }
+      // Una atención nueva que no pidió este teléfono —la central lo despachó, el sistema le asignó un traslado, el
+      // compañero tomó un incidente— se muestra en el acto, esté donde esté: es la llamada de la central. Lo que toma
+      // él lo guarda su propia acción, sin pasar por acá.
+      if (antes !== undefined && activa !== null && activa.id !== antes?.id) {
+        irAInicio()
       }
       return activa
     },

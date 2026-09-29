@@ -5,6 +5,7 @@ import { Button, Paragraph, Spinner, useToastController } from 'tamagui'
 
 import { paramedicoGuardadoQuery, servicioActualQuery } from '@/features/servicio/queries'
 import { mensajeDeError } from '@/shared/api/cliente'
+import { irAInicio } from '@/shared/navegacion/inicio'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
 
 import { incidenteYaTomado, type IncidenteAbierto, type IncidenteYaTomado } from './api'
@@ -49,6 +50,9 @@ export function AccionesTomar({ incidente }: { incidente: IncidenteAbierto }) {
     ? motivoNoDisponible(servicio.data.enServicio, servicio.data.turno !== null, servicio.data.ambulancia?.estado)
     : null
   const puedeAcudir = servicio.data !== undefined && motivo === null
+  // Con una atención en curso no se acude a otra: lo que queda es volver a la suya.
+  const conAtencion =
+    servicio.data?.enServicio === true && servicio.data.turno !== null && servicio.data.ambulancia?.estado === 'EN_ATENCION'
 
   /**
    * Sin aviso: la app va directo a Inicio, donde está la atención en curso con a dónde va. No vuelve atrás: si el
@@ -115,16 +119,24 @@ export function AccionesTomar({ incidente }: { incidente: IncidenteAbierto }) {
           {motivo}
         </Paragraph>
       ) : null}
-      <BotonPrincipal
-        disabled={!puedeAcudir || tomar.isPending}
-        opacity={!puedeAcudir || tomar.isPending ? 0.6 : 1}
-        icon={tomar.isPending ? <Spinner color="$primarioTexto" /> : undefined}
-        onPress={tomarIncidente}
-      >
-        <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
-          {tomar.isPaused ? 'Esperando conexión…' : 'Voy a este incidente'}
-        </Button.Text>
-      </BotonPrincipal>
+      {conAtencion ? (
+        <BotonPrincipal onPress={irAInicio}>
+          <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
+            Ir a mi atención
+          </Button.Text>
+        </BotonPrincipal>
+      ) : (
+        <BotonPrincipal
+          disabled={!puedeAcudir || tomar.isPending}
+          opacity={!puedeAcudir || tomar.isPending ? 0.6 : 1}
+          icon={tomar.isPending ? <Spinner color="$primarioTexto" /> : undefined}
+          onPress={tomarIncidente}
+        >
+          <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
+            {tomar.isPaused ? 'Esperando conexión…' : 'Voy a este incidente'}
+          </Button.Text>
+        </BotonPrincipal>
+      )}
 
       <DialogoSumarse contexto={yaTomado} enviando={sumarse.isPending} onSumarse={sumarme} onDesistir={desistir} />
     </>
