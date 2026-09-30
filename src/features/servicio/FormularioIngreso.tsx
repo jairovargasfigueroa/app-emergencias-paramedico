@@ -62,6 +62,9 @@ type Props = {
  * Entrada de todos los días, con el teléfono ya activado: el número, que casi siempre es el de la última vez, y el
  * PIN. Si el servidor dice que este teléfono ya no es el suyo o que la cuenta no está activada, la clave guardada no
  * sirve más: se olvida y se pasa a activar con un código nuevo de la central.
+ *
+ * Salvo que el número sea otro: entonces es un compañero probando en un teléfono ajeno, y la clave sigue siendo
+ * del dueño. Borrarla lo dejaría a él sin poder entrar hasta que la central le dé otro código.
  */
 export function FormularioIngreso({ claveDispositivo, telefonoInicial, onActivar }: Props) {
   const queryClient = useQueryClient()
@@ -79,6 +82,13 @@ export function FormularioIngreso({ claveDispositivo, telefonoInicial, onActivar
       } catch (error) {
         const motivo = motivoParaActivar(error)
         if (motivo) {
+          if (telefonoInicial.trim() !== '' && telefono !== telefonoInicial.trim()) {
+            onActivar(
+              telefono,
+              'Este teléfono está vinculado a la cuenta de otro paramédico. Para usarlo con la tuya, escribe el código de activación que te dé la central.',
+            )
+            return
+          }
           // Primero el cambio de modo, que lleva el número y el motivo; después se olvida la clave, que ya no sirve.
           onActivar(telefono, motivo)
           await olvidarClaveDispositivo(queryClient)
