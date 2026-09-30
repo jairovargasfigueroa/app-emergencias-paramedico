@@ -1,8 +1,13 @@
 import * as SecureStore from 'expo-secure-store'
 
-/** Lo que queda guardado en el teléfono al entrar: el token con el que se llama a la API y quién es. */
+/**
+ * Lo que queda guardado en el teléfono al entrar: el token con el que se llama a la API, hasta cuándo vale y quién es.
+ * `venceEn` es un instante ISO-8601 en UTC, el mismo del `exp` del token. Es `null` solo si una sesión guardada antes
+ * de que el servidor lo informara trae un token que no se puede leer.
+ */
 export type Sesion<T> = {
   token: string
+  venceEn: string | null
   usuario: T
 }
 
@@ -19,9 +24,10 @@ export async function leerSesion<T>(): Promise<Sesion<T> | null> {
     return null
   }
   try {
-    const sesion = JSON.parse(guardada) as Sesion<T>
+    const sesion = JSON.parse(guardada) as Omit<Sesion<T>, 'venceEn'> & { venceEn?: string | null }
     tokenEnMemoria = sesion.token
-    return sesion
+    // Las sesiones abiertas antes de que el servidor informara el vencimiento no lo traen: se lee del propio token.
+    return { ...sesion, venceEn: sesion.venceEn ?? venceEnDelToken(sesion.token) }
   } catch {
     tokenEnMemoria = null
     return null
@@ -49,4 +55,19 @@ export async function tokenActual(): Promise<string | null> {
     return sesion?.token ?? null
   })
   return lectura
+}
+
+/** Vencimiento de un JWT: su parte central es JSON en base64url y `exp` va en segundos. `null` si no se puede leer. */
+function venceEnDelToken(token: string): string | null {
+  try {
+    const partes = token.split('.')
+    if (partes.length !== 3) {
+      return null
+    }
+    const base64 = partes[1].replace(/-/g, '+').replace(/_/g, '/')
+    const datos = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='))) as { exp?: unknown }
+    return typeof datos.exp === 'number' ? new Date(datos.exp * 1000).toISOString() : null
+  } catch {
+    return null
+  }
 }

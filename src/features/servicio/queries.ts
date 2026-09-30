@@ -86,8 +86,8 @@ export const terminarTurnoMutation = (queryClient: QueryClient) =>
 export const identificarMutation = (queryClient: QueryClient) =>
   mutationOptions({
     mutationFn: async (telefono: string) => {
-      const { token, paramedico } = await servicioApi.identificar(telefono)
-      const sesion = { token, usuario: { id: paramedico.id, nombreCompleto: paramedico.nombreCompleto } }
+      const { token, venceEn, paramedico } = await servicioApi.identificar(telefono)
+      const sesion = { token, venceEn, usuario: { id: paramedico.id, nombreCompleto: paramedico.nombreCompleto } }
       await guardarSesion(sesion)
       return sesion
     },

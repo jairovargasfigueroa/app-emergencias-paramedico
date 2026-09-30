@@ -47,9 +47,13 @@ export type ServicioActual = {
   turno: Turno | null
 }
 
-/** `SesionResponse.Paramedico` del backend: el token y el paramédico al que pertenece. */
+/**
+ * `SesionResponse.Paramedico` del backend: el token, cuándo vence y el paramédico al que pertenece. `venceEn` es un
+ * instante ISO-8601 en UTC y coincide con el `exp` del token.
+ */
 export type SesionParamedico = {
   token: string
+  venceEn: string
   paramedico: Paramedico
 }
 
