@@ -1,11 +1,23 @@
 import { mutationOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
 
 import { ErrorApi } from '@/shared/api/cliente'
-import { guardarSesion } from '@/shared/sesion/almacen'
+import {
+  guardarClaveDispositivo,
+  guardarSesion,
+  guardarUltimoTelefono,
+  type Dispositivo,
+  type Sesion,
+} from '@/shared/sesion/almacen'
 import { cerrarSesion, sesionKeys, sesionQuery } from '@/shared/sesion/queries'
 
 import { guardarAvisoDeServicioVisto, leerAvisoDeServicioVisto, type ParamedicoGuardado } from './almacen'
-import { servicioApi, type ServicioActual } from './api'
+import {
+  servicioApi,
+  type DatosActivacion,
+  type DatosIngreso,
+  type ServicioActual,
+  type SesionParamedico,
+} from './api'
 
 export const servicioKeys = {
   actual: (paramedicoId: number) => ['servicio', paramedicoId] as const,
@@ -83,15 +95,46 @@ export const terminarTurnoMutation = (queryClient: QueryClient) =>
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['servicio'] }),
   })
 
-export const identificarMutation = (queryClient: QueryClient) =>
+/** Guarda la sesión que devolvió el servidor al entrar: el token, cuándo vence y quién es. */
+async function guardarSesionDe({ token, venceEn, paramedico }: SesionParamedico) {
+  const sesion: Sesion<ParamedicoGuardado> = {
+    token,
+    venceEn,
+    usuario: { id: paramedico.id, nombreCompleto: paramedico.nombreCompleto },
+  }
+  await guardarSesion(sesion)
+  return sesion
+}
+
+/**
+ * Activa este teléfono con el código que la central le entregó al paramédico y el PIN que crea. La clave que vuelve se
+ * guarda antes que la sesión: el servidor la entrega una sola vez, y sin ella este teléfono necesitaría otro código.
+ */
+export const activarTelefonoMutation = (queryClient: QueryClient) =>
   mutationOptions({
-    mutationFn: async (telefono: string) => {
-      const { token, venceEn, paramedico } = await servicioApi.identificar(telefono)
-      const sesion = { token, venceEn, usuario: { id: paramedico.id, nombreCompleto: paramedico.nombreCompleto } }
-      await guardarSesion(sesion)
-      return sesion
+    mutationFn: async (datos: DatosActivacion) => {
+      const { claveDispositivo, ...respuesta } = await servicioApi.activar(datos)
+      await guardarClaveDispositivo(claveDispositivo)
+      await guardarUltimoTelefono(datos.telefono)
+      const sesion = await guardarSesionDe(respuesta)
+      return { sesion, dispositivo: { claveDispositivo, ultimoTelefono: datos.telefono } }
     },
-    onSuccess: (sesion) => {
+    onSuccess: ({ sesion, dispositivo }) => {
+      queryClient.setQueryData<Dispositivo>(sesionKeys.dispositivo, dispositivo)
+      queryClient.setQueryData(sesionKeys.actual, sesion)
+    },
+  })
+
+/** La entrada de todos los días: su número, su PIN y la clave de este teléfono. */
+export const ingresarConPinMutation = (queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: async (datos: DatosIngreso) => {
+      const respuesta = await servicioApi.ingresar(datos)
+      await guardarUltimoTelefono(datos.telefono)
+      return guardarSesionDe(respuesta)
+    },
+    onSuccess: (sesion, { telefono, claveDispositivo }) => {
+      queryClient.setQueryData<Dispositivo>(sesionKeys.dispositivo, { claveDispositivo, ultimoTelefono: telefono })
       queryClient.setQueryData(sesionKeys.actual, sesion)
     },
   })

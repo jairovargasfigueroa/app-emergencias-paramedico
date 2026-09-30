@@ -15,6 +15,7 @@ import { TamaguiProvider, ToastProvider, ToastViewport } from 'tamagui'
 import { paramedicoGuardadoQuery } from '@/features/servicio/queries'
 import { TareasEnServicio } from '@/features/servicio/TareasEnServicio'
 import { queryClient, useFocoDeLaApp } from '@/shared/query/queryClient'
+import { dispositivoQuery } from '@/shared/sesion/queries'
 import { ToastActual } from '@/shared/ui/ToastActual'
 import { tamaguiConfig } from '@/tamagui.config'
 import { coloresClaro, coloresOscuro } from '@/tema/colores'
@@ -78,10 +79,15 @@ export default function LayoutRaiz() {
   )
 }
 
-/** Sin identificación solo existe esa pantalla. Al identificarse, el guard cambia y el router lleva al mapa. */
+/**
+ * Sin identificación solo existe esa pantalla. Al identificarse, el guard cambia y el router lleva al mapa. Antes de
+ * mostrar nada se leen también la clave y el último número del teléfono: la entrada abre en el modo que corresponde,
+ * sin parpadear.
+ */
 function Pantallas() {
   const paramedico = useQuery(paramedicoGuardadoQuery())
-  const listo = !paramedico.isPending
+  const dispositivo = useQuery(dispositivoQuery())
+  const listo = !paramedico.isPending && !dispositivo.isPending
 
   useEffect(() => {
     if (listo) {
