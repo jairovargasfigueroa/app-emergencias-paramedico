@@ -11,7 +11,19 @@ export type Sesion<T> = {
   usuario: T
 }
 
+/**
+ * Lo que es del teléfono y no de la sesión, así que sobrevive a cerrarla: la clave que lo vincula a la cuenta del
+ * paramédico y el último número con el que se entró.
+ */
+export type Dispositivo = {
+  /** El servidor la entrega una sola vez, al activar. Sin ella, este teléfono se activa con un código de la central. */
+  claveDispositivo: string | null
+  ultimoTelefono: string | null
+}
+
 const CLAVE_SESION = 'sga.sesion'
+const CLAVE_DISPOSITIVO = 'sga.clave-dispositivo'
+const CLAVE_ULTIMO_TELEFONO = 'sga.ultimo-telefono'
 
 /** Copia en memoria del token, para no leer el almacén seguro en cada petición. */
 let tokenEnMemoria: string | null | undefined
@@ -70,4 +82,32 @@ function venceEnDelToken(token: string): string | null {
   } catch {
     return null
   }
+}
+
+/**
+ * Si el almacén no se puede leer, se toma como un teléfono sin activar: la salida es la misma que con uno nuevo, un
+ * código de la central.
+ */
+export async function leerDispositivo(): Promise<Dispositivo> {
+  try {
+    const [claveDispositivo, ultimoTelefono] = await Promise.all([
+      SecureStore.getItemAsync(CLAVE_DISPOSITIVO),
+      SecureStore.getItemAsync(CLAVE_ULTIMO_TELEFONO),
+    ])
+    return { claveDispositivo, ultimoTelefono }
+  } catch {
+    return { claveDispositivo: null, ultimoTelefono: null }
+  }
+}
+
+export function guardarClaveDispositivo(claveDispositivo: string) {
+  return SecureStore.setItemAsync(CLAVE_DISPOSITIVO, claveDispositivo)
+}
+
+export function borrarClaveDispositivo() {
+  return SecureStore.deleteItemAsync(CLAVE_DISPOSITIVO)
+}
+
+export function guardarUltimoTelefono(telefono: string) {
+  return SecureStore.setItemAsync(CLAVE_ULTIMO_TELEFONO, telefono)
 }
