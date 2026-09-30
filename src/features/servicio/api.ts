@@ -83,6 +83,12 @@ export type DatosIngreso = {
   claveDispositivo: string
 }
 
+/** `IniciarTurnoRequest` del backend: el PIN otra vez, desde el teléfono vinculado. */
+export type DatosInicioTurno = {
+  pin: string
+  claveDispositivo: string
+}
+
 export const servicioApi = {
   /** Primera vez en este teléfono: el código que dio la central prueba quién es, y ahí crea su PIN. */
   activar: (datos: DatosActivacion) =>
@@ -92,7 +98,7 @@ export const servicioApi = {
   actual: (signal?: AbortSignal) => api.get<ServicioActual>('/paramedicos/actual', { signal }),
   registrarDispositivo: (tokenPush: string) => api.post<void>('/paramedicos/actual/dispositivo', { tokenPush }),
   /** Entra a trabajar: su unidad pasa a contar como disponible y empieza a compartir la posición. */
-  iniciarTurno: () => api.post<Turno>('/paramedicos/actual/turno/inicio'),
+  iniciarTurno: (datos: DatosInicioTurno) => api.post<Turno>('/paramedicos/actual/turno/inicio', datos),
   /** Sale de trabajar. El backend lo rechaza con una atención en curso. */
   terminarTurno: () => api.post<Turno>('/paramedicos/actual/turno/cierre'),
   /** ME-1 M5: tras una avería, el paramédico vuelve a poner la ambulancia DISPONIBLE (PB-05 R11). */

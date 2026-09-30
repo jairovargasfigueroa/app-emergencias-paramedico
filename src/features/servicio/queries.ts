@@ -8,13 +8,14 @@ import {
   type Dispositivo,
   type Sesion,
 } from '@/shared/sesion/almacen'
-import { cerrarSesion, sesionKeys, sesionQuery } from '@/shared/sesion/queries'
+import { cerrarSesion, olvidarClaveDispositivo, sesionKeys, sesionQuery } from '@/shared/sesion/queries'
 
 import { guardarAvisoDeServicioVisto, leerAvisoDeServicioVisto, type ParamedicoGuardado } from './almacen'
 import {
   servicioApi,
   type DatosActivacion,
   type DatosIngreso,
+  type DatosInicioTurno,
   type ServicioActual,
   type SesionParamedico,
 } from './api'
@@ -68,11 +69,16 @@ async function servicioTrasConflicto(queryClient: QueryClient, error: unknown): 
   return queryClient.getQueriesData<ServicioActual>({ queryKey: ['servicio'] })[0]?.[1] ?? null
 }
 
-/** El turno se refleja en el servicio, así que al abrirlo o cerrarlo se vuelve a consultar todo de una vez. */
+/**
+ * El turno se refleja en el servicio, así que al abrirlo o cerrarlo se vuelve a consultar todo de una vez. Entrar pide
+ * el PIN otra vez, como quien ficha al llegar: la sesión dura meses y el teléfono pudo quedar en otras manos. Acá un
+ * 409 no se toma como "ya estaba hecho", a diferencia de terminar el turno: un PIN equivocado o un teléfono que ya no
+ * es el suyo son errores de verdad y se le muestran.
+ */
 export const iniciarTurnoMutation = (queryClient: QueryClient) =>
   mutationOptions({
-    mutationFn: () => servicioApi.iniciarTurno(),
-    onSuccess: (_turno, _variables, _contexto) => queryClient.invalidateQueries({ queryKey: ['servicio'] }),
+    mutationFn: (datos: DatosInicioTurno) => servicioApi.iniciarTurno(datos),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['servicio'] }),
   })
 
 /**
@@ -163,4 +169,14 @@ export const reactivarAmbulanciaMutation = (queryClient: QueryClient) =>
 export async function olvidarParamedico(queryClient: QueryClient) {
   queryClient.removeQueries({ queryKey: ['servicio'] })
   await cerrarSesion(queryClient)
+}
+
+/**
+ * Para activar este teléfono otra vez con un código de la central: un PIN bloqueado, otro teléfono vinculado o una
+ * sesión de antes de que existiera el PIN. La clave guardada no sirve para nada de eso, así que se olvida primero:
+ * sin ella, la entrada abre directo en la activación. Después se cierra la sesión.
+ */
+export async function activarDeNuevo(queryClient: QueryClient) {
+  await olvidarClaveDispositivo(queryClient)
+  await olvidarParamedico(queryClient)
 }
