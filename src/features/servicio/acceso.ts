@@ -23,7 +23,10 @@ export const MENSAJE_PIN_DEBIL =
   'Ese PIN es muy fácil de adivinar. No uses todos los números iguales ni seguidos, como 111111 o 123456.'
 
 /** El PIN son 6 dígitos. Si no los tiene, no se revisa nada más: un mensaje por vez. */
-export const esquemaPin = z.string().regex(/^\d{6}$/, { error: 'El PIN tiene 6 números.', abort: true })
+export const esquemaPin = z
+  .string()
+  .min(1, { error: 'Escribe tu PIN.', abort: true })
+  .regex(/^\d{6}$/, { error: 'El PIN tiene que tener 6 números.', abort: true })
 
 /** El PIN que se crea al activar el teléfono: además, que no sea fácil de adivinar. */
 export const esquemaPinNuevo = esquemaPin.refine((pin) => !esPinDebil(pin), MENSAJE_PIN_DEBIL)
