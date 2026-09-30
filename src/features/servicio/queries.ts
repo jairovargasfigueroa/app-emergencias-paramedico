@@ -165,8 +165,33 @@ export const reactivarAmbulanciaMutation = (queryClient: QueryClient) =>
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['servicio'] }),
   })
 
-/** Salir, o el backend ya no reconoce al paramédico guardado: la app vuelve a pedir la identificación. */
+/** Lo más que se espera al servidor para dejar de recibir avisos: salir de la app no puede trabar al paramédico. */
+const LIMITE_PARA_RETIRAR_AVISOS_MS = 2_000
+
+/**
+ * Pide que este teléfono deje de recibir los avisos de la cuenta: quien lo use después no tiene por qué ver las
+ * emergencias de otro. Es de mejor esfuerzo: si falla o tarda, se sigue igual. Si el pedido no llegó, el servidor igual
+ * le saca el token a esta cuenta cuando otro paramédico entre en este teléfono y lo registre.
+ */
+async function dejarDeRecibirAvisos() {
+  const corte = new AbortController()
+  const limite = setTimeout(() => corte.abort(), LIMITE_PARA_RETIRAR_AVISOS_MS)
+  try {
+    await servicioApi.retirarDispositivo(corte.signal)
+  } catch {
+    // Sin conexión, sin respuesta a tiempo o un paramédico que el servidor ya no reconoce: la sesión se cierra igual.
+  } finally {
+    clearTimeout(limite)
+  }
+}
+
+/**
+ * Salir, o el backend ya no reconoce al paramédico guardado: la app vuelve a pedir la identificación. Primero, con la
+ * sesión todavía abierta, este teléfono deja de recibir sus avisos; después se borra la sesión. La clave del teléfono y
+ * el último número quedan: son del teléfono, no de la sesión.
+ */
 export async function olvidarParamedico(queryClient: QueryClient) {
+  await dejarDeRecibirAvisos()
   queryClient.removeQueries({ queryKey: ['servicio'] })
   await cerrarSesion(queryClient)
 }

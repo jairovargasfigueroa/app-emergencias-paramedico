@@ -97,6 +97,8 @@ export const servicioApi = {
   ingresar: (datos: DatosIngreso) => api.post<SesionParamedico>('/auth/paramedico', datos, { sinToken: true }),
   actual: (signal?: AbortSignal) => api.get<ServicioActual>('/paramedicos/actual', { signal }),
   registrarDispositivo: (tokenPush: string) => api.post<void>('/paramedicos/actual/dispositivo', { tokenPush }),
+  /** Al cerrar sesión: este teléfono deja de recibir los avisos de esta cuenta. */
+  retirarDispositivo: (signal?: AbortSignal) => api.delete<void>('/paramedicos/actual/dispositivo', { signal }),
   /** Entra a trabajar: su unidad pasa a contar como disponible y empieza a compartir la posición. */
   iniciarTurno: (datos: DatosInicioTurno) => api.post<Turno>('/paramedicos/actual/turno/inicio', datos),
   /** Sale de trabajar. El backend lo rechaza con una atención en curso. */
