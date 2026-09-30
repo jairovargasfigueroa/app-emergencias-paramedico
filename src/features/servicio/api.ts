@@ -26,6 +26,10 @@ export type Paramedico = {
   telefono: string
   activo: boolean
   asignacionVigente: AsignacionVigente | null
+  /** Tiene PIN y un teléfono vinculado. Si no, necesita un código de activación de la central. */
+  activado: boolean
+  /** Su PIN se bloqueó por intentos fallidos: no entra hasta activar el teléfono con un código nuevo. */
+  bloqueado: boolean
 }
 
 /** `TurnoResponse` del backend: el turno abierto del paramédico. */
