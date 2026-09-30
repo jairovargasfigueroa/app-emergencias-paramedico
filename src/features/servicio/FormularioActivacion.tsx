@@ -68,7 +68,7 @@ type Props = {
 /**
  * Primera vez en este teléfono, o un código nuevo después de un PIN bloqueado o de un cambio de teléfono: la central
  * le entrega el código al paramédico en persona, y con él crea el PIN que le va a pedir la app para entrar y para
- * iniciar cada turno. El PIN se revisa acá con las mismas reglas del servidor, antes de gastar un intento del código.
+ * iniciar cada turno. El PIN se revisa acá con las mismas reglas del servidor, para avisarlo antes de enviar.
  */
 export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin }: Props) {
   const tema = useTheme()
