@@ -112,6 +112,11 @@ export function formatearCodigoActivacion(texto: string) {
   return caracteres.length > 4 ? `${caracteres.slice(0, 4)}-${caracteres.slice(4)}` : caracteres
 }
 
+/** Si el código tiene sus 8 letras y números: recién ahí vale la pena mandarlo, que cada código equivocado cuenta. */
+export function codigoActivacionCompleto(codigo: string) {
+  return codigo.replace(/[^A-Za-z0-9]/g, '').length === LARGO_CODIGO_ACTIVACION
+}
+
 export const MENSAJE_TELEFONO_NO_ENCONTRADO =
   'No encontramos ese teléfono. Pídele al administrador que verifique con qué número te registró.'
 

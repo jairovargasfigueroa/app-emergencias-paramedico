@@ -11,6 +11,7 @@ import { CajitasDeCodigo } from '@/shared/ui/CajitasDeCodigo'
 import { MensajeDeCampo, textoDeErrores } from '@/shared/ui/MensajeDeCampo'
 
 import {
+  codigoActivacionCompleto,
   codigoDeError,
   esquemaPinNuevo,
   formatearCodigoActivacion,
@@ -41,6 +42,19 @@ const esquema = z
     error: 'Los dos PIN no coinciden.',
     path: ['confirmacion'],
   })
+
+/**
+ * "Activar" se habilita recién con todo en regla: el teléfono escrito, el código completo, el PIN con las cuatro
+ * reglas cumplidas y repetido igual. Lo que falta se ve en cada campo, sin tener que tocar el botón para enterarse.
+ */
+function listoParaActivar({ telefono, codigo, pin, confirmacion }: z.input<typeof esquema>) {
+  return (
+    telefono.trim() !== '' &&
+    codigoActivacionCompleto(codigo) &&
+    revisarPinNuevo(pin, telefono).every((regla) => regla.estado === 'cumple') &&
+    confirmacion === pin
+  )
+}
 
 /** Un rechazo del servidor va junto al campo que hay que corregir; si no es de ninguno, sobre el botón. */
 type ErrorServidor = { campo: 'telefono' | 'codigo' | 'pin' | null; texto: string }
@@ -320,13 +334,13 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
 
       <YStack flex={1} minH={32} />
 
-      <form.Subscribe selector={(estado) => [estado.isSubmitting] as const}>
-        {([enviando]) => (
+      <form.Subscribe selector={(estado) => [estado.isSubmitting, listoParaActivar(estado.values)] as const}>
+        {([enviando, listo]) => (
           <YStack gap={12}>
             <MensajeDeCampo texto={errorServidor?.campo === null ? errorServidor.texto : null} />
             <BotonPrincipal
-              disabled={enviando}
-              opacity={enviando ? 0.7 : 1}
+              disabled={enviando || !listo}
+              opacity={enviando ? 0.7 : listo ? 1 : 0.5}
               icon={enviando ? <Spinner color="$primarioTexto" /> : undefined}
               onPress={enviar}
             >
