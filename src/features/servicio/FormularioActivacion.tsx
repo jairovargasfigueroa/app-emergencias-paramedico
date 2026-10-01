@@ -17,6 +17,7 @@ import {
   intentosRestantes,
   MENSAJE_PIN_DEL_TELEFONO,
   MENSAJE_TELEFONO_NO_ENCONTRADO,
+  pinCompleto,
   revisarPinNuevo,
   saleDelTelefono,
   textoIntentos,
@@ -245,8 +246,13 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
                   <form.Subscribe selector={(estado) => [estado.values.pin, estado.values.telefono] as const}>
                     {([pin, telefono]) => (
                       <YStack gap={4}>
-                        {revisarPinNuevo(pin, telefono).map((regla) => (
-                          <LineaDeRegla key={regla.texto} texto={regla.texto} estado={regla.estado} />
+                        {revisarPinNuevo(pin, telefono).map(({ texto, estado }) => (
+                          <LineaDeRegla
+                            key={texto}
+                            texto={texto}
+                            estado={estado}
+                            etiqueta={`${texto}: ${MARCAS[estado].lectura}`}
+                          />
                         ))}
                       </YStack>
                     )}
@@ -275,9 +281,23 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
             const mensaje = textoDeErrores(field.state.meta.errors)
             return (
               <YStack gap={8}>
-                <Label htmlFor="confirmacion" color="$texto" fontSize={14} lineHeight={20} fontWeight="500">
-                  Repite el PIN
-                </Label>
+                <YStack gap={2}>
+                  <Label htmlFor="confirmacion" color="$texto" fontSize={14} lineHeight={20} fontWeight="500">
+                    Repite el PIN
+                  </Label>
+                  {/* Con los 6 números, y como las reglas, arriba de las cajitas para que el teclado no lo tape. */}
+                  <form.Subscribe selector={(estado) => [estado.values.pin, estado.values.confirmacion] as const}>
+                    {([pin, confirmacion]) =>
+                      pinCompleto(confirmacion) ? (
+                        confirmacion === pin ? (
+                          <LineaDeRegla texto="Coinciden" estado="cumple" />
+                        ) : (
+                          <LineaDeRegla texto="No coincide con el que creaste" estado="no-cumple" />
+                        )
+                      ) : null
+                    }
+                  </form.Subscribe>
+                </YStack>
                 {/* Al completarla no se activa sola: el PIN se crea una vez y se revisa antes de tocar "Activar". */}
                 <CajitasDeCodigo
                   id="confirmacion"
@@ -341,8 +361,13 @@ const MARCAS = {
   'no-cumple': { icono: 'x', color: 'primarioPresionado', lectura: 'no se cumple' },
 } as const
 
-/** Una regla con su marca. Para el lector de pantalla, la marca va dicha en palabras junto al texto. */
-function LineaDeRegla({ texto, estado }: ReglaRevisada) {
+type PropsLinea = ReglaRevisada & {
+  /** Lo que dice el lector de pantalla, que no ve la marca. Sin ella, dice el texto tal cual. */
+  etiqueta?: string
+}
+
+/** Un texto con su marca: una regla del PIN, o si el repetido coincide. */
+function LineaDeRegla({ texto, estado, etiqueta }: PropsLinea) {
   const tema = useTheme()
   const marca = MARCAS[estado]
   return (
@@ -350,7 +375,7 @@ function LineaDeRegla({ texto, estado }: ReglaRevisada) {
       <YStack aria-hidden>
         <Feather name={marca.icono} size={16} color={tema[marca.color]?.val} />
       </YStack>
-      <Text color={`$${marca.color}`} fontSize={14} lineHeight={20} aria-label={`${texto}: ${marca.lectura}`}>
+      <Text color={`$${marca.color}`} fontSize={14} lineHeight={20} aria-label={etiqueta}>
         {texto}
       </Text>
     </XStack>
