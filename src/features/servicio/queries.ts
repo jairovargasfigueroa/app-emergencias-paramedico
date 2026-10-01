@@ -85,20 +85,39 @@ export const iniciarTurnoMutation = (queryClient: QueryClient) =>
  * Si la central ya le cerró el turno, el servidor rechaza cerrarlo de nuevo: no es un error, ya está hecho. En ese caso
  * devuelve `null`.
  */
+async function terminarTurno(queryClient: QueryClient) {
+  try {
+    return await servicioApi.terminarTurno()
+  } catch (error) {
+    const servicio = await servicioTrasConflicto(queryClient, error)
+    if (servicio && !servicio.turno) {
+      return null
+    }
+    throw error
+  }
+}
+
 export const terminarTurnoMutation = (queryClient: QueryClient) =>
   mutationOptions({
-    mutationFn: async () => {
-      try {
-        return await servicioApi.terminarTurno()
-      } catch (error) {
-        const servicio = await servicioTrasConflicto(queryClient, error)
-        if (servicio && !servicio.turno) {
-          return null
-        }
-        throw error
-      }
-    },
+    mutationFn: () => terminarTurno(queryClient),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['servicio'] }),
+  })
+
+/**
+ * Salir de la app deja de ser trabajar: con el turno abierto, primero se termina, con las mismas reglas que a mano —con
+ * una atención en curso no se puede—, y si no se pudo, la sesión sigue abierta. Si no, la unidad quedaría contando
+ * como disponible sin nadie que reciba sus emergencias. No espera a que vuelva la conexión: sin ella no se puede
+ * terminar el turno, y una salida en pausa cerraría la sesión cuando ya nadie lo espera.
+ */
+export const cerrarSesionMutation = (queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: async (enTurno: boolean) => {
+      if (enTurno) {
+        await terminarTurno(queryClient)
+      }
+      await olvidarParamedico(queryClient)
+    },
+    networkMode: 'always',
   })
 
 /** Guarda la sesión que devolvió el servidor al entrar: el token, cuándo vence y quién es. */
