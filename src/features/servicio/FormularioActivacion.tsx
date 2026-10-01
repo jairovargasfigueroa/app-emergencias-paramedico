@@ -82,6 +82,13 @@ function errorDeActivacion(error: unknown): ErrorServidor {
   }
 }
 
+/** Gris mientras no se puede revisar, verde si se cumple y roja si no: se lee de un vistazo, sin leer el texto. */
+const MARCAS = {
+  pendiente: { icono: 'circle', color: 'textoSecundario', lectura: 'sin revisar todavía' },
+  cumple: { icono: 'check', color: 'disponibleTexto', lectura: 'se cumple' },
+  'no-cumple': { icono: 'x', color: 'primarioPresionado', lectura: 'no se cumple' },
+} as const
+
 type Props = {
   telefonoInicial: string
   /** Por qué se pide activar otra vez, si fue el servidor el que lo pidió. */
@@ -367,13 +374,6 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
     </>
   )
 }
-
-/** Gris mientras no se puede revisar, verde si se cumple y roja si no: se lee de un vistazo, sin leer el texto. */
-const MARCAS = {
-  pendiente: { icono: 'circle', color: 'textoSecundario', lectura: 'sin revisar todavía' },
-  cumple: { icono: 'check', color: 'disponibleTexto', lectura: 'se cumple' },
-  'no-cumple': { icono: 'x', color: 'primarioPresionado', lectura: 'no se cumple' },
-} as const
 
 type PropsLinea = ReglaRevisada & {
   /** Lo que dice el lector de pantalla, que no ve la marca. Sin ella, dice el texto tal cual. */
