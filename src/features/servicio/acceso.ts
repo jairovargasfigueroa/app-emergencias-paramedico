@@ -31,19 +31,6 @@ export const esquemaPin = z
 /** El PIN que se crea al activar el teléfono: además, que no sea fácil de adivinar. */
 export const esquemaPinNuevo = esquemaPin.refine((pin) => !esPinDebil(pin), MENSAJE_PIN_DEBIL)
 
-/**
- * Cómo se escribe un PIN: teclado numérico, oculto y sin que el teléfono lo guarde ni lo sugiera. Si el
- * autocompletado lo recordara, pedirlo no probaría quién tiene el teléfono en la mano.
- */
-export const propsCampoPin = {
-  keyboardType: 'number-pad',
-  secureTextEntry: true,
-  maxLength: 6,
-  autoComplete: 'off',
-  importantForAutofill: 'no',
-  textContentType: 'none',
-} as const
-
 export const MENSAJE_TELEFONO_NO_ENCONTRADO =
   'No encontramos ese teléfono. Pídele al administrador que verifique con qué número te registró.'
 
