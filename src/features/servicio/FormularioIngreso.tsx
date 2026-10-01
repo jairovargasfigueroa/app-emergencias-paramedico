@@ -21,13 +21,17 @@ const esquema = z.object({
 /** Un rechazo del servidor va junto al campo que hay que corregir; si no es de ninguno, sobre el botón. */
 type ErrorServidor = { campo: 'telefono' | 'pin' | null; texto: string }
 
-/** Por qué hay que volver a activar el teléfono, dicho como lo diría la central. `null` si el rechazo es otro. */
+/**
+ * Por qué hay que volver a activar el teléfono, dicho como lo diría la central. `null` si el rechazo es otro. Este
+ * teléfono ya estuvo activado, así que una cuenta sin activar quiere decir que la central le generó un código nuevo:
+ * eso anula el PIN de antes.
+ */
 function motivoParaActivar(error: unknown) {
   switch (codigoDeError(error)) {
     case 'DISPOSITIVO_NO_VINCULADO':
       return 'Tu cuenta se activó en otro teléfono. Para usar este, escribe el código nuevo que te dé la central.'
     case 'PARAMEDICO_SIN_ACTIVAR':
-      return 'Tu cuenta todavía no está activada. Escribe el código de activación que te dio la central.'
+      return 'Tu PIN anterior ya no sirve: la central te generó un código. Escríbelo y crea un PIN nuevo.'
     default:
       return null
   }
