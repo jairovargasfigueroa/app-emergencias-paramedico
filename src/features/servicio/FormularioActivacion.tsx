@@ -15,8 +15,9 @@ import {
   esquemaPinNuevo,
   formatearCodigoActivacion,
   intentosRestantes,
-  MENSAJE_PIN_DEBIL,
+  MENSAJE_PIN_DEL_TELEFONO,
   MENSAJE_TELEFONO_NO_ENCONTRADO,
+  saleDelTelefono,
   textoIntentos,
 } from './acceso'
 import { activarTelefonoMutation } from './queries'
@@ -27,6 +28,11 @@ const esquema = z
     codigo: z.string().trim().min(1, 'Escribe el código que te dio la central.'),
     pin: esquemaPinNuevo,
     confirmacion: z.string().min(1, 'Vuelve a escribir el PIN.'),
+  })
+  // La última regla del PIN necesita el teléfono. Si el PIN ya falló otra, ni se revisa: un mensaje por vez.
+  .refine(({ pin, telefono }) => !saleDelTelefono(pin, telefono), {
+    error: MENSAJE_PIN_DEL_TELEFONO,
+    path: ['pin'],
   })
   .refine(({ pin, confirmacion }) => !confirmacion || pin === confirmacion, {
     error: 'Los dos PIN no coinciden.',
@@ -52,7 +58,8 @@ function errorDeActivacion(error: unknown): ErrorServidor {
     case 'CODIGO_ACTIVACION_VENCIDO':
       return { campo: 'codigo', texto: 'Tu código venció. Pídele a la central un código nuevo.' }
     case 'PIN_DEBIL':
-      return { campo: 'pin', texto: MENSAJE_PIN_DEBIL }
+      // El servidor dice cuál de las reglas no se cumple: son las mismas que se revisan acá.
+      return { campo: 'pin', texto: mensajeDeError(error) }
     default:
       return { campo: null, texto: mensajeDeError(error) }
   }
