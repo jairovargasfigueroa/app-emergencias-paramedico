@@ -2,7 +2,7 @@ import Feather from '@expo/vector-icons/Feather'
 import { useForm } from '@tanstack/react-form'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Button, H1, Input, Label, Paragraph, Spinner, XStack, YStack, useTheme } from 'tamagui'
+import { Button, H1, Input, Label, Paragraph, Spinner, Text, XStack, YStack, useTheme } from 'tamagui'
 import { z } from 'zod'
 
 import { mensajeDeError } from '@/shared/api/cliente'
@@ -11,13 +11,18 @@ import { CajitasDeCodigo } from '@/shared/ui/CajitasDeCodigo'
 import { MensajeDeCampo, textoDeErrores } from '@/shared/ui/MensajeDeCampo'
 
 import {
+  codigoActivacionCompleto,
   codigoDeError,
   esquemaPinNuevo,
   formatearCodigoActivacion,
   intentosRestantes,
-  MENSAJE_PIN_DEBIL,
+  MENSAJE_PIN_DEL_TELEFONO,
   MENSAJE_TELEFONO_NO_ENCONTRADO,
+  pinCompleto,
+  revisarPinNuevo,
+  saleDelTelefono,
   textoIntentos,
+  type ReglaRevisada,
 } from './acceso'
 import { activarTelefonoMutation } from './queries'
 
@@ -28,10 +33,28 @@ const esquema = z
     pin: esquemaPinNuevo,
     confirmacion: z.string().min(1, 'Vuelve a escribir el PIN.'),
   })
+  // La última regla del PIN necesita el teléfono. Si el PIN ya falló otra, ni se revisa: un mensaje por vez.
+  .refine(({ pin, telefono }) => !saleDelTelefono(pin, telefono), {
+    error: MENSAJE_PIN_DEL_TELEFONO,
+    path: ['pin'],
+  })
   .refine(({ pin, confirmacion }) => !confirmacion || pin === confirmacion, {
     error: 'Los dos PIN no coinciden.',
     path: ['confirmacion'],
   })
+
+/**
+ * "Activar" se habilita recién con todo en regla: el teléfono escrito, el código completo, el PIN con las cuatro
+ * reglas cumplidas y repetido igual. Lo que falta se ve en cada campo, sin tener que tocar el botón para enterarse.
+ */
+function listoParaActivar({ telefono, codigo, pin, confirmacion }: z.input<typeof esquema>) {
+  return (
+    telefono.trim() !== '' &&
+    codigoActivacionCompleto(codigo) &&
+    revisarPinNuevo(pin, telefono).every((regla) => regla.estado === 'cumple') &&
+    confirmacion === pin
+  )
+}
 
 /** Un rechazo del servidor va junto al campo que hay que corregir; si no es de ninguno, sobre el botón. */
 type ErrorServidor = { campo: 'telefono' | 'codigo' | 'pin' | null; texto: string }
@@ -52,11 +75,19 @@ function errorDeActivacion(error: unknown): ErrorServidor {
     case 'CODIGO_ACTIVACION_VENCIDO':
       return { campo: 'codigo', texto: 'Tu código venció. Pídele a la central un código nuevo.' }
     case 'PIN_DEBIL':
-      return { campo: 'pin', texto: MENSAJE_PIN_DEBIL }
+      // El servidor dice cuál de las reglas no se cumple: son las mismas que se revisan acá.
+      return { campo: 'pin', texto: mensajeDeError(error) }
     default:
       return { campo: null, texto: mensajeDeError(error) }
   }
 }
+
+/** Gris mientras no se puede revisar, verde si se cumple y roja si no: se lee de un vistazo, sin leer el texto. */
+const MARCAS = {
+  pendiente: { icono: 'circle', color: 'textoSecundario', lectura: 'sin revisar todavía' },
+  cumple: { icono: 'check', color: 'disponibleTexto', lectura: 'se cumple' },
+  'no-cumple': { icono: 'x', color: 'primarioPresionado', lectura: 'no se cumple' },
+} as const
 
 type Props = {
   telefonoInicial: string
@@ -229,9 +260,24 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
                       </Button.Text>
                     </Button>
                   </XStack>
-                  <Paragraph color="$textoSecundario" fontSize={13} lineHeight={18}>
-                    6 números que no sean todos iguales ni seguidos.
-                  </Paragraph>
+                  {/*
+                    Arriba de las cajitas y no abajo: mientras se escribe, lo de abajo queda tapado por el teclado.
+                    Escucha también el teléfono, que cambia la última regla.
+                  */}
+                  <form.Subscribe selector={(estado) => [estado.values.pin, estado.values.telefono] as const}>
+                    {([pin, telefono]) => (
+                      <YStack gap={4}>
+                        {revisarPinNuevo(pin, telefono).map(({ texto, estado }) => (
+                          <LineaDeRegla
+                            key={texto}
+                            texto={texto}
+                            estado={estado}
+                            etiqueta={`${texto}: ${MARCAS[estado].lectura}`}
+                          />
+                        ))}
+                      </YStack>
+                    )}
+                  </form.Subscribe>
                 </YStack>
                 <CajitasDeCodigo
                   id="pin"
@@ -256,9 +302,23 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
             const mensaje = textoDeErrores(field.state.meta.errors)
             return (
               <YStack gap={8}>
-                <Label htmlFor="confirmacion" color="$texto" fontSize={14} lineHeight={20} fontWeight="500">
-                  Repite el PIN
-                </Label>
+                <YStack gap={2}>
+                  <Label htmlFor="confirmacion" color="$texto" fontSize={14} lineHeight={20} fontWeight="500">
+                    Repite el PIN
+                  </Label>
+                  {/* Con los 6 números, y como las reglas, arriba de las cajitas para que el teclado no lo tape. */}
+                  <form.Subscribe selector={(estado) => [estado.values.pin, estado.values.confirmacion] as const}>
+                    {([pin, confirmacion]) =>
+                      pinCompleto(confirmacion) ? (
+                        confirmacion === pin ? (
+                          <LineaDeRegla texto="Coinciden" estado="cumple" />
+                        ) : (
+                          <LineaDeRegla texto="No coincide con el que creaste" estado="no-cumple" />
+                        )
+                      ) : null
+                    }
+                  </form.Subscribe>
+                </YStack>
                 {/* Al completarla no se activa sola: el PIN se crea una vez y se revisa antes de tocar "Activar". */}
                 <CajitasDeCodigo
                   id="confirmacion"
@@ -281,13 +341,13 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
 
       <YStack flex={1} minH={32} />
 
-      <form.Subscribe selector={(estado) => [estado.isSubmitting] as const}>
-        {([enviando]) => (
+      <form.Subscribe selector={(estado) => [estado.isSubmitting, listoParaActivar(estado.values)] as const}>
+        {([enviando, listo]) => (
           <YStack gap={12}>
             <MensajeDeCampo texto={errorServidor?.campo === null ? errorServidor.texto : null} />
             <BotonPrincipal
-              disabled={enviando}
-              opacity={enviando ? 0.7 : 1}
+              disabled={enviando || !listo}
+              opacity={enviando ? 0.7 : listo ? 1 : 0.5}
               icon={enviando ? <Spinner color="$primarioTexto" /> : undefined}
               onPress={enviar}
             >
@@ -312,5 +372,26 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
         )}
       </form.Subscribe>
     </>
+  )
+}
+
+type PropsLinea = ReglaRevisada & {
+  /** Lo que dice el lector de pantalla, que no ve la marca. Sin ella, dice el texto tal cual. */
+  etiqueta?: string
+}
+
+/** Un texto con su marca: una regla del PIN, o si el repetido coincide. */
+function LineaDeRegla({ texto, estado, etiqueta }: PropsLinea) {
+  const tema = useTheme()
+  const marca = MARCAS[estado]
+  return (
+    <XStack items="center" gap={8}>
+      <YStack aria-hidden>
+        <Feather name={marca.icono} size={16} color={tema[marca.color]?.val} />
+      </YStack>
+      <Text color={`$${marca.color}`} fontSize={14} lineHeight={20} aria-label={etiqueta}>
+        {texto}
+      </Text>
+    </XStack>
   )
 }
