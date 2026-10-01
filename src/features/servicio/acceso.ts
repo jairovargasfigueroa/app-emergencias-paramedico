@@ -31,18 +31,22 @@ export const esquemaPin = z
 /** El PIN que se crea al activar el teléfono: además, que no sea fácil de adivinar. */
 export const esquemaPinNuevo = esquemaPin.refine((pin) => !esPinDebil(pin), MENSAJE_PIN_DEBIL)
 
+/** Las letras y números del código de activación, sin contar el guion. */
+const LARGO_CODIGO_ACTIVACION = 8
+
 /**
- * Cómo se escribe un PIN: teclado numérico, oculto y sin que el teléfono lo guarde ni lo sugiera. Si el
- * autocompletado lo recordara, pedirlo no probaría quién tiene el teléfono en la mano.
+ * El código de activación tal como lo entrega la central, `XXXX-XXXX`, mientras se escribe: en mayúsculas, sin lo que
+ * no sea letra o número y con el guion después del cuarto carácter. El guion aparece recién con el quinto: si
+ * apareciera con el cuarto, borrar hacia atrás lo volvería a poner y no se podría pasar de ahí. El servidor acepta el
+ * código con guion o sin él.
  */
-export const propsCampoPin = {
-  keyboardType: 'number-pad',
-  secureTextEntry: true,
-  maxLength: 6,
-  autoComplete: 'off',
-  importantForAutofill: 'no',
-  textContentType: 'none',
-} as const
+export function formatearCodigoActivacion(texto: string) {
+  const caracteres = texto
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, LARGO_CODIGO_ACTIVACION)
+  return caracteres.length > 4 ? `${caracteres.slice(0, 4)}-${caracteres.slice(4)}` : caracteres
+}
 
 export const MENSAJE_TELEFONO_NO_ENCONTRADO =
   'No encontramos ese teléfono. Pídele al administrador que verifique con qué número te registró.'

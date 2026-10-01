@@ -3,15 +3,16 @@ import { useForm } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Button, H2, Input, Label, Paragraph, Sheet, Spinner, YStack, useTheme, type TamaguiElement } from 'tamagui'
+import { Button, H2, Label, Paragraph, Sheet, Spinner, YStack, useTheme, type TamaguiElement } from 'tamagui'
 import { z } from 'zod'
 
 import { mensajeDeError } from '@/shared/api/cliente'
 import { dispositivoQuery } from '@/shared/sesion/queries'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
+import { CajitasDeCodigo } from '@/shared/ui/CajitasDeCodigo'
 import { MensajeDeCampo, textoDeErrores } from '@/shared/ui/MensajeDeCampo'
 
-import { codigoDeError, esquemaPin, mensajePinIncorrecto, propsCampoPin } from './acceso'
+import { codigoDeError, esquemaPin, mensajePinIncorrecto } from './acceso'
 import { activarDeNuevo, iniciarTurnoMutation } from './queries'
 
 const esquema = z.object({ pin: esquemaPin })
@@ -102,6 +103,13 @@ export function DialogoIniciarTurno({ abierto, placa, onCerrar }: Props) {
 
   const enviar = () => form.handleSubmit().catch(() => {})
   const ocupado = iniciar.isPending || activando
+
+  /** Con el sexto número entra de turno solo: con guantes, es un toque menos. Si ya salió un intento, no sale otro. */
+  function enviarAlCompletar() {
+    if (!form.state.isSubmitting) {
+      enviar()
+    }
+  }
 
   function cerrar() {
     if (ocupado) {
@@ -207,24 +215,20 @@ export function DialogoIniciarTurno({ abierto, placa, onCerrar }: Props) {
                     <Label htmlFor="pin-turno" color="$texto" fontSize={14} lineHeight={20} fontWeight="500">
                       PIN
                     </Label>
-                    <Input
+                    <CajitasDeCodigo
                       ref={campoPin}
                       id="pin-turno"
-                      size="$5"
-                      height={56}
-                      rounded={12}
-                      fontSize={18}
-                      bg="$fondo"
-                      borderColor={mensaje ? '$primario' : '$bordeFuerte'}
-                      {...propsCampoPin}
-                      value={field.state.value}
-                      onChangeText={(texto) => {
+                      etiqueta="PIN"
+                      oculto
+                      fondo="$fondo"
+                      error={Boolean(mensaje)}
+                      valor={field.state.value}
+                      onCambiar={(valor) => {
                         setErrorServidor(null)
-                        field.handleChange(texto)
+                        field.handleChange(valor)
                       }}
+                      onCompletar={enviarAlCompletar}
                       onBlur={field.handleBlur}
-                      returnKeyType="done"
-                      onSubmitEditing={enviar}
                     />
                     <MensajeDeCampo texto={mensaje} />
                   </YStack>

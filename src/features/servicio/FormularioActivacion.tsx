@@ -7,15 +7,16 @@ import { z } from 'zod'
 
 import { mensajeDeError } from '@/shared/api/cliente'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
+import { CajitasDeCodigo } from '@/shared/ui/CajitasDeCodigo'
 import { MensajeDeCampo, textoDeErrores } from '@/shared/ui/MensajeDeCampo'
 
 import {
   codigoDeError,
   esquemaPinNuevo,
+  formatearCodigoActivacion,
   intentosRestantes,
   MENSAJE_PIN_DEBIL,
   MENSAJE_TELEFONO_NO_ENCONTRADO,
-  propsCampoPin,
   textoIntentos,
 } from './acceso'
 import { activarTelefonoMutation } from './queries'
@@ -75,6 +76,8 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
   const queryClient = useQueryClient()
   const activar = useMutation(activarTelefonoMutation(queryClient))
   const [errorServidor, setErrorServidor] = useState<ErrorServidor | null>(null)
+  // Arranca oculto: mostrarlo lo decide quien lo escribe, que es el que ve quién tiene al lado.
+  const [pinOculto, setPinOculto] = useState(true)
 
   const form = useForm({
     defaultValues: { telefono: telefonoInicial, codigo: '', pin: '', confirmacion: '' },
@@ -170,7 +173,10 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
                     Te lo da la central.
                   </Paragraph>
                 </YStack>
-                {/* En mono: el código se dicta o se copia de un papel, y así cada carácter se distingue bien. */}
+                {/*
+                  En mono y con la forma en que lo entrega la central: el código se dicta o se copia de un papel, y así
+                  cada carácter se distingue bien y se compara de a cuatro.
+                */}
                 <Input
                   id="codigo"
                   size="$5"
@@ -183,7 +189,7 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
                   value={field.state.value}
                   onChangeText={(texto) => {
                     setErrorServidor(null)
-                    field.handleChange(texto)
+                    field.handleChange(formatearCodigoActivacion(texto))
                   }}
                   onBlur={field.handleBlur}
                   placeholder="XXXX-XXXX"
@@ -205,26 +211,37 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
             return (
               <YStack gap={8}>
                 <YStack gap={2}>
-                  <Label htmlFor="pin" color="$texto" fontSize={14} lineHeight={20} fontWeight="500">
-                    PIN nuevo
-                  </Label>
+                  <XStack items="center" justify="space-between" gap={12}>
+                    <Label htmlFor="pin" color="$texto" fontSize={14} lineHeight={20} fontWeight="500">
+                      Crea tu PIN
+                    </Label>
+                    {/* Uno solo para las dos filas: así se comparan a la vista, sin acordarse de lo escrito. */}
+                    <Button
+                      height={48}
+                      px={12}
+                      rounded={14}
+                      chromeless
+                      icon={<Feather name={pinOculto ? 'eye' : 'eye-off'} size={18} color={tema.texto?.val} />}
+                      onPress={() => setPinOculto((oculto) => !oculto)}
+                    >
+                      <Button.Text color="$texto" fontSize={15} fontWeight="500">
+                        {pinOculto ? 'Mostrar PIN' : 'Ocultar PIN'}
+                      </Button.Text>
+                    </Button>
+                  </XStack>
                   <Paragraph color="$textoSecundario" fontSize={13} lineHeight={18}>
                     6 números que no sean todos iguales ni seguidos.
                   </Paragraph>
                 </YStack>
-                <Input
+                <CajitasDeCodigo
                   id="pin"
-                  size="$5"
-                  height={56}
-                  rounded={12}
-                  fontSize={18}
-                  bg="$superficie"
-                  borderColor={mensaje ? '$primario' : '$bordeFuerte'}
-                  {...propsCampoPin}
-                  value={field.state.value}
-                  onChangeText={(texto) => {
+                  etiqueta="Crea tu PIN"
+                  oculto={pinOculto}
+                  error={Boolean(mensaje)}
+                  valor={field.state.value}
+                  onCambiar={(valor) => {
                     setErrorServidor(null)
-                    field.handleChange(texto)
+                    field.handleChange(valor)
                   }}
                   onBlur={field.handleBlur}
                 />
@@ -242,23 +259,18 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
                 <Label htmlFor="confirmacion" color="$texto" fontSize={14} lineHeight={20} fontWeight="500">
                   Repite el PIN
                 </Label>
-                <Input
+                {/* Al completarla no se activa sola: el PIN se crea una vez y se revisa antes de tocar "Activar". */}
+                <CajitasDeCodigo
                   id="confirmacion"
-                  size="$5"
-                  height={56}
-                  rounded={12}
-                  fontSize={18}
-                  bg="$superficie"
-                  borderColor={mensaje ? '$primario' : '$bordeFuerte'}
-                  {...propsCampoPin}
-                  value={field.state.value}
-                  onChangeText={(texto) => {
+                  etiqueta="Repite el PIN"
+                  oculto={pinOculto}
+                  error={Boolean(mensaje)}
+                  valor={field.state.value}
+                  onCambiar={(valor) => {
                     setErrorServidor(null)
-                    field.handleChange(texto)
+                    field.handleChange(valor)
                   }}
                   onBlur={field.handleBlur}
-                  returnKeyType="done"
-                  onSubmitEditing={enviar}
                 />
                 <MensajeDeCampo texto={mensaje} />
               </YStack>

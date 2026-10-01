@@ -7,15 +7,10 @@ import { z } from 'zod'
 import { mensajeDeError } from '@/shared/api/cliente'
 import { olvidarClaveDispositivo } from '@/shared/sesion/queries'
 import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
+import { CajitasDeCodigo } from '@/shared/ui/CajitasDeCodigo'
 import { MensajeDeCampo, textoDeErrores } from '@/shared/ui/MensajeDeCampo'
 
-import {
-  codigoDeError,
-  esquemaPin,
-  MENSAJE_TELEFONO_NO_ENCONTRADO,
-  mensajePinIncorrecto,
-  propsCampoPin,
-} from './acceso'
+import { codigoDeError, esquemaPin, MENSAJE_TELEFONO_NO_ENCONTRADO, mensajePinIncorrecto } from './acceso'
 import { ingresarConPinMutation } from './queries'
 
 const esquema = z.object({
@@ -106,6 +101,16 @@ export function FormularioIngreso({ claveDispositivo, telefonoInicial, onActivar
 
   const enviar = () => form.handleSubmit().catch(() => {})
 
+  /**
+   * Con el sexto número entra solo: con guantes, es un toque menos. Sin el teléfono escrito no se sabe de quién es el
+   * PIN, y si ya salió un intento, no sale otro detrás.
+   */
+  function enviarAlCompletar() {
+    if (form.getFieldValue('telefono').trim() !== '' && !form.state.isSubmitting) {
+      enviar()
+    }
+  }
+
   return (
     <>
       <YStack gap={10} mt={40}>
@@ -159,23 +164,18 @@ export function FormularioIngreso({ claveDispositivo, telefonoInicial, onActivar
                 <Label htmlFor="pin" color="$texto" fontSize={14} lineHeight={20} fontWeight="500">
                   PIN
                 </Label>
-                <Input
+                <CajitasDeCodigo
                   id="pin"
-                  size="$5"
-                  height={56}
-                  rounded={12}
-                  fontSize={18}
-                  bg="$superficie"
-                  borderColor={mensaje ? '$primario' : '$bordeFuerte'}
-                  {...propsCampoPin}
-                  value={field.state.value}
-                  onChangeText={(texto) => {
+                  etiqueta="PIN"
+                  oculto
+                  error={Boolean(mensaje)}
+                  valor={field.state.value}
+                  onCambiar={(valor) => {
                     setErrorServidor(null)
-                    field.handleChange(texto)
+                    field.handleChange(valor)
                   }}
+                  onCompletar={enviarAlCompletar}
                   onBlur={field.handleBlur}
-                  returnKeyType="done"
-                  onSubmitEditing={enviar}
                 />
                 <MensajeDeCampo texto={mensaje} />
               </YStack>
