@@ -1,49 +1,59 @@
-import { useForm } from '@tanstack/react-form'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { KeyboardAvoidingView, ScrollView } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Button, H1, Input, Label, Paragraph, Spinner, Text, XStack, YStack } from 'tamagui'
-import { z } from 'zod'
+import { Text, XStack, YStack } from 'tamagui'
 
-import { ErrorApi, mensajeDeError } from '@/shared/api/cliente'
-import { BotonPrincipal } from '@/shared/ui/BotonPrincipal'
+import { dispositivoQuery } from '@/shared/sesion/queries'
 import { MarcaSga } from '@/shared/ui/MarcaSga'
-import { MensajeDeCampo, textoDeErrores } from '@/shared/ui/MensajeDeCampo'
+import { PantallaDeEstado } from '@/shared/ui/PantallaDeEstado'
 
-import { identificarMutation } from './queries'
+import { FormularioActivacion } from './FormularioActivacion'
+import { FormularioIngreso } from './FormularioIngreso'
 
-const esquema = z.object({
-  telefono: z.string().trim().min(1, 'Escribe tu teléfono.'),
-})
+/**
+ * Entrada a la app, como en una central de verdad: la central crea la cuenta y le entrega al paramédico, en persona, un
+ * código de activación. Con ese código activa su teléfono y crea su PIN; de ahí en adelante entra con el PIN y solo
+ * desde ese teléfono. Sin la clave del teléfono guardada, se activa; con ella, se pide el PIN.
+ */
+export function PantallaIdentificacion() {
+  const dispositivo = useQuery(dispositivoQuery())
 
-/** 404: no hay un paramédico activo con ese teléfono. El mensaje dice qué hacer, no solo que no se encontró. */
-function mensajeDeIdentificacion(error: unknown) {
-  if (error instanceof ErrorApi && error.status === 404) {
-    return 'No encontramos ese teléfono. Pídele al administrador que verifique con qué número te registró.'
+  if (dispositivo.isPending) {
+    return <PantallaDeEstado cargando />
   }
-  return mensajeDeError(error)
+
+  return (
+    <Identificacion
+      claveDispositivo={dispositivo.data?.claveDispositivo ?? null}
+      ultimoTelefono={dispositivo.data?.ultimoTelefono ?? null}
+    />
+  )
 }
 
-/** Identificación provisional por teléfono, mientras no exista autenticación. */
-export function PantallaIdentificacion() {
-  const margenes = useSafeAreaInsets()
-  const queryClient = useQueryClient()
-  const identificar = useMutation(identificarMutation(queryClient))
-  const [errorServidor, setErrorServidor] = useState<string | null>(null)
+type Props = {
+  claveDispositivo: string | null
+  ultimoTelefono: string | null
+}
 
-  const form = useForm({
-    defaultValues: { telefono: '' },
-    validators: { onSubmit: esquema },
-    onSubmit: async ({ value }) => {
-      setErrorServidor(null)
-      try {
-        await identificar.mutateAsync(esquema.parse(value).telefono)
-      } catch (error) {
-        setErrorServidor(mensajeDeIdentificacion(error))
-      }
-    },
-  })
+function Identificacion({ claveDispositivo, ultimoTelefono }: Props) {
+  const margenes = useSafeAreaInsets()
+  const [modo, setModo] = useState<'pin' | 'activacion'>(claveDispositivo ? 'pin' : 'activacion')
+  // El número pasa de un modo al otro tal como quedó escrito.
+  const [telefono, setTelefono] = useState(ultimoTelefono ?? '')
+  const [aviso, setAviso] = useState<string | null>(null)
+
+  function irAActivacion(telefonoEscrito: string, motivo?: string) {
+    setTelefono(telefonoEscrito)
+    setAviso(motivo ?? null)
+    setModo('activacion')
+  }
+
+  function irAlPin(telefonoEscrito: string) {
+    setTelefono(telefonoEscrito)
+    setAviso(null)
+    setModo('pin')
+  }
 
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
@@ -56,71 +66,21 @@ export function PantallaIdentificacion() {
             </Text>
           </XStack>
 
-          <YStack gap={10} mt={40}>
-            <H1 color="$texto" fontSize={28} lineHeight={34} fontWeight="600">
-              ¿Quién está de turno?
-            </H1>
-            <Paragraph color="$textoSecundario" fontSize={16} lineHeight={24}>
-              Escribe el teléfono con el que te registró el administrador.
-            </Paragraph>
-          </YStack>
-
-          <form.Field name="telefono">
-            {(field) => {
-              const mensaje = errorServidor ?? textoDeErrores(field.state.meta.errors)
-              return (
-                <YStack gap={8} mt={36}>
-                  <Label htmlFor="telefono" color="$texto" fontSize={14} lineHeight={20} fontWeight="500">
-                    Teléfono
-                  </Label>
-                  <Input
-                    id="telefono"
-                    size="$5"
-                    height={56}
-                    rounded={12}
-                    fontSize={18}
-                    bg="$superficie"
-                    borderColor={mensaje ? '$primario' : '$bordeFuerte'}
-                    value={field.state.value}
-                    onChangeText={(texto) => {
-                      setErrorServidor(null)
-                      field.handleChange(texto)
-                    }}
-                    onBlur={field.handleBlur}
-                    keyboardType="phone-pad"
-                    autoComplete="tel"
-                    textContentType="telephoneNumber"
-                    returnKeyType="done"
-                    onSubmitEditing={() => form.handleSubmit().catch(() => {})}
-                  />
-                  <MensajeDeCampo texto={mensaje} />
-                </YStack>
-              )
-            }}
-          </form.Field>
-
-          <YStack flex={1} minH={32} />
-
-          <YStack gap={12}>
-            <form.Subscribe selector={(estado) => [estado.isSubmitting] as const}>
-              {([enviando]) => (
-                <BotonPrincipal
-                  disabled={enviando}
-                  opacity={enviando ? 0.7 : 1}
-                  icon={enviando ? <Spinner color="$primarioTexto" /> : undefined}
-                  onPress={() => form.handleSubmit().catch(() => {})}
-                >
-                  <Button.Text color="$primarioTexto" fontSize={17} fontWeight="600">
-                    {identificar.isPaused ? 'Esperando conexión…' : 'Entrar'}
-                  </Button.Text>
-                </BotonPrincipal>
-              )}
-            </form.Subscribe>
-            {/* Lo que pasa al entrar, antes de tocar: queda en servicio y su unidad empieza a figurar en el mapa. */}
-            <Paragraph color="$textoSecundario" fontSize={14} lineHeight={20} text="center">
-              Al entrar quedas en servicio: tu unidad aparece en el mapa y empiezas a recibir emergencias.
-            </Paragraph>
-          </YStack>
+          {modo === 'pin' && claveDispositivo ? (
+            <FormularioIngreso
+              key="pin"
+              claveDispositivo={claveDispositivo}
+              telefonoInicial={telefono}
+              onActivar={irAActivacion}
+            />
+          ) : (
+            <FormularioActivacion
+              key="activacion"
+              telefonoInicial={telefono}
+              aviso={aviso}
+              onIngresarConPin={claveDispositivo ? irAlPin : undefined}
+            />
+          )}
         </YStack>
       </ScrollView>
     </KeyboardAvoidingView>

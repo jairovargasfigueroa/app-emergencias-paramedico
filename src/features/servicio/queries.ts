@@ -1,11 +1,24 @@
 import { mutationOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
 
 import { ErrorApi } from '@/shared/api/cliente'
-import { guardarSesion } from '@/shared/sesion/almacen'
-import { cerrarSesion, sesionKeys, sesionQuery } from '@/shared/sesion/queries'
+import {
+  guardarClaveDispositivo,
+  guardarSesion,
+  guardarUltimoTelefono,
+  type Dispositivo,
+  type Sesion,
+} from '@/shared/sesion/almacen'
+import { cerrarSesion, olvidarClaveDispositivo, sesionKeys, sesionQuery } from '@/shared/sesion/queries'
 
 import { guardarAvisoDeServicioVisto, leerAvisoDeServicioVisto, type ParamedicoGuardado } from './almacen'
-import { servicioApi, type ServicioActual } from './api'
+import {
+  servicioApi,
+  type DatosActivacion,
+  type DatosIngreso,
+  type DatosInicioTurno,
+  type ServicioActual,
+  type SesionParamedico,
+} from './api'
 
 export const servicioKeys = {
   actual: (paramedicoId: number) => ['servicio', paramedicoId] as const,
@@ -56,42 +69,97 @@ async function servicioTrasConflicto(queryClient: QueryClient, error: unknown): 
   return queryClient.getQueriesData<ServicioActual>({ queryKey: ['servicio'] })[0]?.[1] ?? null
 }
 
-/** El turno se refleja en el servicio, así que al abrirlo o cerrarlo se vuelve a consultar todo de una vez. */
+/**
+ * El turno se refleja en el servicio, así que al abrirlo o cerrarlo se vuelve a consultar todo de una vez. Entrar pide
+ * el PIN otra vez, como quien ficha al llegar: la sesión dura meses y el teléfono pudo quedar en otras manos. Acá un
+ * 409 no se toma como "ya estaba hecho", a diferencia de terminar el turno: un PIN equivocado o un teléfono que ya no
+ * es el suyo son errores de verdad y se le muestran.
+ */
 export const iniciarTurnoMutation = (queryClient: QueryClient) =>
   mutationOptions({
-    mutationFn: () => servicioApi.iniciarTurno(),
-    onSuccess: (_turno, _variables, _contexto) => queryClient.invalidateQueries({ queryKey: ['servicio'] }),
+    mutationFn: (datos: DatosInicioTurno) => servicioApi.iniciarTurno(datos),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['servicio'] }),
   })
 
 /**
  * Si la central ya le cerró el turno, el servidor rechaza cerrarlo de nuevo: no es un error, ya está hecho. En ese caso
  * devuelve `null`.
  */
+async function terminarTurno(queryClient: QueryClient) {
+  try {
+    return await servicioApi.terminarTurno()
+  } catch (error) {
+    const servicio = await servicioTrasConflicto(queryClient, error)
+    if (servicio && !servicio.turno) {
+      return null
+    }
+    throw error
+  }
+}
+
 export const terminarTurnoMutation = (queryClient: QueryClient) =>
   mutationOptions({
-    mutationFn: async () => {
-      try {
-        return await servicioApi.terminarTurno()
-      } catch (error) {
-        const servicio = await servicioTrasConflicto(queryClient, error)
-        if (servicio && !servicio.turno) {
-          return null
-        }
-        throw error
-      }
-    },
+    mutationFn: () => terminarTurno(queryClient),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['servicio'] }),
   })
 
-export const identificarMutation = (queryClient: QueryClient) =>
+/**
+ * Salir de la app deja de ser trabajar: con el turno abierto, primero se termina, con las mismas reglas que a mano —con
+ * una atención en curso no se puede—, y si no se pudo, la sesión sigue abierta. Si no, la unidad quedaría contando
+ * como disponible sin nadie que reciba sus emergencias. No espera a que vuelva la conexión: sin ella no se puede
+ * terminar el turno, y una salida en pausa cerraría la sesión cuando ya nadie lo espera.
+ */
+export const cerrarSesionMutation = (queryClient: QueryClient) =>
   mutationOptions({
-    mutationFn: async (telefono: string) => {
-      const { token, paramedico } = await servicioApi.identificar(telefono)
-      const sesion = { token, usuario: { id: paramedico.id, nombreCompleto: paramedico.nombreCompleto } }
-      await guardarSesion(sesion)
-      return sesion
+    mutationFn: async (enTurno: boolean) => {
+      if (enTurno) {
+        await terminarTurno(queryClient)
+      }
+      await olvidarParamedico(queryClient)
     },
-    onSuccess: (sesion) => {
+    networkMode: 'always',
+  })
+
+/** Guarda la sesión que devolvió el servidor al entrar: el token, cuándo vence y quién es. */
+async function guardarSesionDe({ token, venceEn, paramedico }: SesionParamedico) {
+  const sesion: Sesion<ParamedicoGuardado> = {
+    token,
+    venceEn,
+    usuario: { id: paramedico.id, nombreCompleto: paramedico.nombreCompleto },
+  }
+  await guardarSesion(sesion)
+  return sesion
+}
+
+/**
+ * Activa este teléfono con el código que la central le entregó al paramédico y el PIN que crea. La clave que vuelve se
+ * guarda antes que la sesión: el servidor la entrega una sola vez, y sin ella este teléfono necesitaría otro código.
+ */
+export const activarTelefonoMutation = (queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: async (datos: DatosActivacion) => {
+      const { claveDispositivo, ...respuesta } = await servicioApi.activar(datos)
+      await guardarClaveDispositivo(claveDispositivo)
+      await guardarUltimoTelefono(datos.telefono)
+      const sesion = await guardarSesionDe(respuesta)
+      return { sesion, dispositivo: { claveDispositivo, ultimoTelefono: datos.telefono } }
+    },
+    onSuccess: ({ sesion, dispositivo }) => {
+      queryClient.setQueryData<Dispositivo>(sesionKeys.dispositivo, dispositivo)
+      queryClient.setQueryData(sesionKeys.actual, sesion)
+    },
+  })
+
+/** La entrada de todos los días: su número, su PIN y la clave de este teléfono. */
+export const ingresarConPinMutation = (queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: async (datos: DatosIngreso) => {
+      const respuesta = await servicioApi.ingresar(datos)
+      await guardarUltimoTelefono(datos.telefono)
+      return guardarSesionDe(respuesta)
+    },
+    onSuccess: (sesion, { telefono, claveDispositivo }) => {
+      queryClient.setQueryData<Dispositivo>(sesionKeys.dispositivo, { claveDispositivo, ultimoTelefono: telefono })
       queryClient.setQueryData(sesionKeys.actual, sesion)
     },
   })
@@ -116,8 +184,42 @@ export const reactivarAmbulanciaMutation = (queryClient: QueryClient) =>
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['servicio'] }),
   })
 
-/** Salir, o el backend ya no reconoce al paramédico guardado: la app vuelve a pedir la identificación. */
+/** Lo más que se espera al servidor para dejar de recibir avisos: salir de la app no puede trabar al paramédico. */
+const LIMITE_PARA_RETIRAR_AVISOS_MS = 2_000
+
+/**
+ * Pide que este teléfono deje de recibir los avisos de la cuenta: quien lo use después no tiene por qué ver las
+ * emergencias de otro. Es de mejor esfuerzo: si falla o tarda, se sigue igual. Si el pedido no llegó, el servidor igual
+ * le saca el token a esta cuenta cuando otro paramédico entre en este teléfono y lo registre.
+ */
+async function dejarDeRecibirAvisos() {
+  const corte = new AbortController()
+  const limite = setTimeout(() => corte.abort(), LIMITE_PARA_RETIRAR_AVISOS_MS)
+  try {
+    await servicioApi.retirarDispositivo(corte.signal)
+  } catch {
+    // Sin conexión, sin respuesta a tiempo o un paramédico que el servidor ya no reconoce: la sesión se cierra igual.
+  } finally {
+    clearTimeout(limite)
+  }
+}
+
+/**
+ * Salir, o el backend ya no reconoce al paramédico guardado: la app vuelve a pedir la identificación. Primero, con la
+ * sesión todavía abierta, este teléfono deja de recibir sus avisos; después se cierra la sesión, que borra lo que la
+ * app trajo de la cuenta. La clave del teléfono y el último número quedan: son del teléfono, no de la sesión.
+ */
 export async function olvidarParamedico(queryClient: QueryClient) {
-  queryClient.removeQueries({ queryKey: ['servicio'] })
+  await dejarDeRecibirAvisos()
   await cerrarSesion(queryClient)
+}
+
+/**
+ * Para activar este teléfono otra vez con un código de la central: un PIN bloqueado, otro teléfono vinculado o una
+ * sesión de antes de que existiera el PIN. La clave guardada no sirve para nada de eso, así que se olvida primero:
+ * sin ella, la entrada abre directo en la activación. Después se cierra la sesión.
+ */
+export async function activarDeNuevo(queryClient: QueryClient) {
+  await olvidarClaveDispositivo(queryClient)
+  await olvidarParamedico(queryClient)
 }

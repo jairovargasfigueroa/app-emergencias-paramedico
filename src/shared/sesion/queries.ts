@@ -1,9 +1,19 @@
-import { queryOptions, type QueryClient } from '@tanstack/react-query'
+import { hashKey, mutationOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
 
-import { borrarSesion, leerSesion } from './almacen'
+import {
+  borrarClaveDispositivo,
+  borrarSesion,
+  guardarSesion,
+  leerDispositivo,
+  leerSesion,
+  type Dispositivo,
+  type Sesion,
+} from './almacen'
+import { sesionApi } from './api'
 
 export const sesionKeys = {
   actual: ['sesion'] as const,
+  dispositivo: ['dispositivo'] as const,
 }
 
 /** Sesión abierta en este teléfono, o `null`. Se lee del almacén local: no depende de la conexión. */
@@ -16,9 +26,78 @@ export const sesionQuery = <T>() =>
     gcTime: Infinity,
   })
 
-/** Cierra la sesión. El guard del router deja a la vista solo la pantalla de entrada. */
+/** La clave y el último número de este teléfono. También se leen del almacén local. */
+export const dispositivoQuery = () =>
+  queryOptions({
+    queryKey: sesionKeys.dispositivo,
+    queryFn: () => leerDispositivo(),
+    networkMode: 'always',
+    staleTime: Infinity,
+    gcTime: Infinity,
+  })
+
+/**
+ * Cambia el token por uno nuevo con la clave del teléfono vinculado. Si ya no se puede renovar —la cuenta se activó en
+ * otro teléfono o se desactivó—, el servidor responde 401 y el manejador global cierra la sesión. Sin conexión falla
+ * y no pasa nada: se vuelve a intentar la próxima vez que se abra la app.
+ */
+export const renovarSesionMutation = (queryClient: QueryClient) =>
+  mutationOptions({
+    mutationFn: async (claveDispositivo: string) => {
+      const tokenAnterior = queryClient.getQueryData<Sesion<unknown> | null>(sesionKeys.actual)?.token
+      const renovada = await sesionApi.renovar(claveDispositivo)
+      return { tokenAnterior, ...renovada }
+    },
+    // Sin esperar a que vuelva la conexión: una renovación en pausa podría salir cuando ya entró otro paramédico.
+    networkMode: 'always',
+    onSuccess: async ({ tokenAnterior, token, venceEn }) => {
+      const actual = queryClient.getQueryData<Sesion<unknown> | null>(sesionKeys.actual)
+      // Si mientras tanto se cerró la sesión o entró otro, el token nuevo ya no es de nadie.
+      if (!actual || actual.token !== tokenAnterior) {
+        return
+      }
+      const renovada = { ...actual, token, venceEn }
+      // Primero la caché, igual que al cerrar la sesión: si justo se cierra, el cierre llega después y gana.
+      queryClient.setQueryData(sesionKeys.actual, renovada)
+      await guardarSesion(renovada)
+    },
+  })
+
+/**
+ * Cierra la sesión, a mano o porque el servidor ya no la reconoce. El guard del router deja a la vista solo la pantalla
+ * de entrada, y después se borra lo que la app trajo de la cuenta.
+ */
 export async function cerrarSesion(queryClient: QueryClient) {
   // Primero la pantalla, después el almacén: nada espera al teléfono para reaccionar.
   queryClient.setQueryData(sesionKeys.actual, null)
-  await borrarSesion()
+  try {
+    await borrarSesion()
+  } finally {
+    // Va después, cuando las pantallas de adentro ya se están cerrando: si se borrara antes, alguna podría volver a
+    // pedir sus datos con el token todavía en memoria.
+    olvidarDatosDeLaCuenta(queryClient)
+  }
+}
+
+/**
+ * Lo que la app trajo de la cuenta, porque el teléfono puede pasar a otro paramédico: sus traslados, con datos de
+ * pacientes, y los envíos que esperaban señal, que saldrían después con la sesión de quien entre. Quedan la sesión, en
+ * null porque el layout la mira siempre, y lo que es del teléfono: su clave y el último número.
+ */
+function olvidarDatosDeLaCuenta(queryClient: QueryClient) {
+  queryClient.getMutationCache().clear()
+  const quedan = [sesionKeys.actual, sesionKeys.dispositivo].map((clave) => hashKey(clave))
+  queryClient.removeQueries({ predicate: (consulta) => !quedan.includes(consulta.queryHash) })
+}
+
+/**
+ * Este teléfono ya no está vinculado a la cuenta: la clave guardada no sirve y la próxima entrada es con un código
+ * nuevo de la central. El último número se conserva, para no tener que escribirlo otra vez.
+ */
+export async function olvidarClaveDispositivo(queryClient: QueryClient) {
+  queryClient.setQueryData<Dispositivo>(sesionKeys.dispositivo, (antes) => ({
+    claveDispositivo: null,
+    ultimoTelefono: antes?.ultimoTelefono ?? null,
+  }))
+  await borrarClaveDispositivo()
 }

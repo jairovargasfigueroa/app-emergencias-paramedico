@@ -4,8 +4,7 @@ import { useEffect } from 'react'
 import { AppState, Platform, type AppStateStatus } from 'react-native'
 
 import { ErrorApi } from '@/shared/api/cliente'
-import { borrarSesion } from '@/shared/sesion/almacen'
-import { sesionKeys } from '@/shared/sesion/queries'
+import { cerrarSesion } from '@/shared/sesion/queries'
 
 // TanStack Query pausa y reanuda las peticiones según la conexión del teléfono.
 onlineManager.setEventListener((setOnline) =>
@@ -20,13 +19,13 @@ function esErrorDefinitivo(error: unknown) {
 }
 
 /**
- * Un 401 es el token vencido o una sesión que el servidor ya no reconoce: se cierra acá, en un solo lugar, y el guard
- * del router devuelve a la pantalla de identificación.
+ * Un 401 es el token vencido o una sesión que el servidor ya no reconoce, como la que se cierra cuando la central le
+ * genera un código de activación al paramédico. Se cierra acá, en un solo lugar y borrando lo mismo que al salir a
+ * mano, y el guard del router devuelve a la pantalla de identificación.
  */
 function alFallarPeticion(error: unknown) {
   if (error instanceof ErrorApi && error.status === 401) {
-    queryClient.setQueryData(sesionKeys.actual, null)
-    void borrarSesion()
+    void cerrarSesion(queryClient)
   }
 }
 
