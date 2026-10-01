@@ -13,6 +13,7 @@ import { MensajeDeCampo, textoDeErrores } from '@/shared/ui/MensajeDeCampo'
 import {
   codigoDeError,
   esquemaPinNuevo,
+  formatearCodigoActivacion,
   intentosRestantes,
   MENSAJE_PIN_DEBIL,
   MENSAJE_TELEFONO_NO_ENCONTRADO,
@@ -172,7 +173,10 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
                     Te lo da la central.
                   </Paragraph>
                 </YStack>
-                {/* En mono: el código se dicta o se copia de un papel, y así cada carácter se distingue bien. */}
+                {/*
+                  En mono y con la forma en que lo entrega la central: el código se dicta o se copia de un papel, y así
+                  cada carácter se distingue bien y se compara de a cuatro.
+                */}
                 <Input
                   id="codigo"
                   size="$5"
@@ -185,7 +189,7 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
                   value={field.state.value}
                   onChangeText={(texto) => {
                     setErrorServidor(null)
-                    field.handleChange(texto)
+                    field.handleChange(formatearCodigoActivacion(texto))
                   }}
                   onBlur={field.handleBlur}
                   placeholder="XXXX-XXXX"
