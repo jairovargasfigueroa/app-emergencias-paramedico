@@ -9,7 +9,7 @@ import { Insignia } from '@/shared/ui/Insignia'
 
 import { horaCorta } from '@/shared/formato/tiempo'
 
-import { olvidarParamedico, terminarTurnoMutation } from './queries'
+import { cerrarSesionMutation, terminarTurnoMutation } from './queries'
 
 type Props = {
   abierta: boolean
@@ -29,6 +29,8 @@ export function HojaDeTurno({ abierta, placa, inicio, onCerrar }: Props) {
   const toast = useToastController()
   const aviso = avisoDeUbicacion(useEstadoUbicacion())
   const terminar = useMutation(terminarTurnoMutation(queryClient))
+  const salir = useMutation(cerrarSesionMutation(queryClient))
+  const ocupado = terminar.isPending || salir.isPending
 
   /**
    * El backend rechaza salir con una atención en curso: el motivo se muestra tal cual lo manda. Con la promesa y no con
@@ -48,16 +50,13 @@ export function HojaDeTurno({ abierta, placa, inicio, onCerrar }: Props) {
   }
 
   /**
-   * Salir de la app deja de ser trabajar: si hay turno abierto, se cierra primero. Con la promesa, igual que al terminar
-   * el turno: con los callbacks de mutate, la hoja desaparecía antes de cerrar la sesión y la sesión quedaba abierta.
+   * Salir de la app deja de ser trabajar: el turno se termina primero, igual que desde el perfil. Al salir, la hoja
+   * desaparece con todo lo de adentro. Con la promesa, igual que al terminar el turno: la hoja puede desaparecer antes
+   * de que termine, y TanStack Query no llama los callbacks de mutate si el componente ya no está.
    */
   function cerrarSesion() {
-    terminar
-      .mutateAsync()
-      .then(() => {
-        onCerrar()
-        void olvidarParamedico(queryClient)
-      })
+    salir
+      .mutateAsync(true)
       .catch((error: unknown) => toast.show('No pudiste cerrar sesión', { message: mensajeDeError(error) }))
   }
 
@@ -66,13 +65,13 @@ export function HojaDeTurno({ abierta, placa, inicio, onCerrar }: Props) {
       modal
       open={abierta}
       onOpenChange={(siguiente: boolean) => {
-        if (!siguiente && !terminar.isPending) {
+        if (!siguiente && !ocupado) {
           onCerrar()
         }
       }}
       snapPointsMode="fit"
       dismissOnSnapToBottom
-      dismissOnOverlayPress={!terminar.isPending}
+      dismissOnOverlayPress={!ocupado}
     >
       <Sheet.Overlay bg="$velo" transition="quick" enterStyle={{ opacity: 0 }} exitStyle={{ opacity: 0 }} />
       <Sheet.Frame
@@ -128,8 +127,8 @@ export function HojaDeTurno({ abierta, placa, inicio, onCerrar }: Props) {
 
         <YStack gap={10}>
           <BotonPrincipal
-            disabled={terminar.isPending}
-            opacity={terminar.isPending ? 0.6 : 1}
+            disabled={ocupado}
+            opacity={ocupado ? 0.6 : 1}
             icon={terminar.isPending ? <Spinner color="$primarioTexto" /> : undefined}
             onPress={terminarTurno}
           >
@@ -142,7 +141,7 @@ export function HojaDeTurno({ abierta, placa, inicio, onCerrar }: Props) {
             rounded={14}
             bg="$superficie"
             borderColor="$bordeFuerte"
-            disabled={terminar.isPending}
+            disabled={ocupado}
             onPress={onCerrar}
           >
             <Button.Text color="$texto" fontSize={16} fontWeight="500">
@@ -150,7 +149,14 @@ export function HojaDeTurno({ abierta, placa, inicio, onCerrar }: Props) {
             </Button.Text>
           </Button>
           {/* Cerrar sesión es la excepción —otro paramédico en este teléfono—, así que va abajo y sin peso. */}
-          <Button height={48} rounded={14} chromeless disabled={terminar.isPending} onPress={cerrarSesion}>
+          <Button
+            height={48}
+            rounded={14}
+            chromeless
+            disabled={ocupado}
+            icon={salir.isPending ? <Spinner color="$textoSecundario" /> : undefined}
+            onPress={cerrarSesion}
+          >
             <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
               Cerrar sesión
             </Button.Text>

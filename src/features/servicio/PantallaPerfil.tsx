@@ -1,16 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ScrollView } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Button, H1, Paragraph, Text, XStack, YStack, useToastController } from 'tamagui'
+import { Button, H1, Paragraph, Spinner, Text, XStack, YStack, useToastController } from 'tamagui'
 
 import { mensajeDeError } from '@/shared/api/cliente'
 import { Insignia } from '@/shared/ui/Insignia'
 
-import { olvidarParamedico, paramedicoGuardadoQuery, servicioActualQuery, terminarTurnoMutation } from './queries'
+import { cerrarSesionMutation, paramedicoGuardadoQuery, servicioActualQuery, terminarTurnoMutation } from './queries'
 
 /**
- * Quién es, con qué unidad trabaja y si está en turno. Terminar el turno y cerrar sesión son dos acciones
- * distintas y se ven separadas: salir de la app no debería dejar a la unidad contada como disponible.
+ * Quién es, con qué unidad trabaja y si está en turno. Terminar el turno y cerrar sesión se ven separados, pero salir
+ * de la app no puede dejar a la unidad contada como disponible: cerrar sesión también termina el turno.
  */
 export function PantallaPerfil() {
   const margenes = useSafeAreaInsets()
@@ -19,6 +19,8 @@ export function PantallaPerfil() {
   const guardado = useQuery(paramedicoGuardadoQuery()).data
   const servicio = useQuery({ ...servicioActualQuery(guardado?.id ?? 0), enabled: guardado != null })
   const terminar = useMutation(terminarTurnoMutation(queryClient))
+  const salir = useMutation(cerrarSesionMutation(queryClient))
+  const ocupado = terminar.isPending || salir.isPending
 
   const datos = servicio.data
 
@@ -34,6 +36,16 @@ export function PantallaPerfil() {
       // El backend rechaza salir con una atención en curso: el motivo se muestra tal cual lo manda.
       onError: (error) => toast.show('No pudiste salir de turno', { message: mensajeDeError(error) }),
     })
+  }
+
+  /**
+   * Si el servicio no cargó, no se sabe si está en turno: se intenta terminarlo igual, y si no tenía, el servidor lo
+   * dice y se sale. Con la promesa y no con los callbacks de mutate: al salir, esta pantalla desaparece.
+   */
+  function cerrarSesion() {
+    salir
+      .mutateAsync(datos ? datos.turno != null : true)
+      .catch((error: unknown) => toast.show('No pudiste cerrar sesión', { message: mensajeDeError(error) }))
   }
 
   return (
@@ -78,8 +90,8 @@ export function PantallaPerfil() {
             height={52}
             rounded={14}
             variant="outlined"
-            disabled={terminar.isPending}
-            opacity={terminar.isPending ? 0.6 : 1}
+            disabled={ocupado}
+            opacity={ocupado ? 0.6 : 1}
             onPress={terminarTurno}
           >
             <Button.Text color="$texto" fontSize={16} fontWeight="600">
@@ -88,11 +100,25 @@ export function PantallaPerfil() {
           </Button>
         ) : null}
 
-        <Button height={52} rounded={14} chromeless onPress={() => void olvidarParamedico(queryClient)}>
-          <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
-            Cerrar sesión
-          </Button.Text>
-        </Button>
+        <YStack gap={4}>
+          <Button
+            height={52}
+            rounded={14}
+            chromeless
+            disabled={ocupado}
+            icon={salir.isPending ? <Spinner color="$textoSecundario" /> : undefined}
+            onPress={cerrarSesion}
+          >
+            <Button.Text color="$textoSecundario" fontSize={15} fontWeight="500">
+              Cerrar sesión
+            </Button.Text>
+          </Button>
+          {datos?.turno ? (
+            <Paragraph color="$textoSecundario" fontSize={13} lineHeight={18} text="center">
+              Al cerrar sesión también terminas tu turno.
+            </Paragraph>
+          ) : null}
+        </YStack>
       </YStack>
     </ScrollView>
   )

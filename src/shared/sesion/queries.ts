@@ -1,4 +1,4 @@
-import { mutationOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
+import { hashKey, mutationOptions, queryOptions, type QueryClient } from '@tanstack/react-query'
 
 import {
   borrarClaveDispositivo,
@@ -63,11 +63,31 @@ export const renovarSesionMutation = (queryClient: QueryClient) =>
     },
   })
 
-/** Cierra la sesión. El guard del router deja a la vista solo la pantalla de entrada. */
+/**
+ * Cierra la sesión, a mano o porque el servidor ya no la reconoce. El guard del router deja a la vista solo la pantalla
+ * de entrada, y después se borra lo que la app trajo de la cuenta.
+ */
 export async function cerrarSesion(queryClient: QueryClient) {
   // Primero la pantalla, después el almacén: nada espera al teléfono para reaccionar.
   queryClient.setQueryData(sesionKeys.actual, null)
-  await borrarSesion()
+  try {
+    await borrarSesion()
+  } finally {
+    // Va después, cuando las pantallas de adentro ya se están cerrando: si se borrara antes, alguna podría volver a
+    // pedir sus datos con el token todavía en memoria.
+    olvidarDatosDeLaCuenta(queryClient)
+  }
+}
+
+/**
+ * Lo que la app trajo de la cuenta, porque el teléfono puede pasar a otro paramédico: sus traslados, con datos de
+ * pacientes, y los envíos que esperaban señal, que saldrían después con la sesión de quien entre. Quedan la sesión, en
+ * null porque el layout la mira siempre, y lo que es del teléfono: su clave y el último número.
+ */
+function olvidarDatosDeLaCuenta(queryClient: QueryClient) {
+  queryClient.getMutationCache().clear()
+  const quedan = [sesionKeys.actual, sesionKeys.dispositivo].map((clave) => hashKey(clave))
+  queryClient.removeQueries({ predicate: (consulta) => !quedan.includes(consulta.queryHash) })
 }
 
 /**
