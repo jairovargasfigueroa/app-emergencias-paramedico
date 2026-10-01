@@ -215,7 +215,7 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
                     <Label htmlFor="pin" color="$texto" fontSize={14} lineHeight={20} fontWeight="500">
                       Crea tu PIN
                     </Label>
-                    {/* Uno solo para las dos filas: a la vista, se compara una con la otra sin acordarse de lo escrito. */}
+                    {/* Uno solo para las dos filas: así se comparan a la vista, sin acordarse de lo escrito. */}
                     <Button
                       height={48}
                       px={12}

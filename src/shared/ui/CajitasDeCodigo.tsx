@@ -120,7 +120,8 @@ export function CajitasDeCodigo({
           onBlur?.()
         }}
         keyboardType="number-pad"
-        // Oculto, también es un campo de contraseña: el lector de pantalla no dice los números y el teclado no los aprende.
+        // Oculto, también es un campo de contraseña: el lector de pantalla no dice los números en voz alta y el
+        // teclado no los aprende.
         secureTextEntry={oculto}
         // Ni se guarda ni se sugiere: si el autocompletado lo recordara, pedirlo no probaría quién tiene el teléfono.
         autoComplete="off"
