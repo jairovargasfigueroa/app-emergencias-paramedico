@@ -53,6 +53,11 @@ export function saleDelTelefono(pin: string, telefono: string) {
 
 export const MENSAJE_PIN_DEL_TELEFONO = 'No uses números de tu teléfono en el PIN: tus compañeros lo conocen.'
 
+/** Si el PIN ya tiene sus 6 números. */
+export function pinCompleto(pin: string) {
+  return /^\d{6}$/.test(pin)
+}
+
 /** El PIN son 6 dígitos. Si no los tiene, no se revisa nada más: un mensaje por vez. */
 export const esquemaPin = z
   .string()
@@ -67,6 +72,28 @@ export const esquemaPin = z
 export const esquemaPinNuevo = esquemaPin
   .refine((pin) => !esPinDebil(pin), { error: MENSAJE_PIN_DEBIL, abort: true })
   .refine((pin) => !esDeLosMasUsados(pin), { error: MENSAJE_PIN_MAS_USADO, abort: true })
+
+/** Cómo va una regla del PIN nuevo mientras se escribe: todavía sin revisar, cumplida o no. */
+export type EstadoRegla = 'pendiente' | 'cumple' | 'no-cumple'
+
+export type ReglaRevisada = { texto: string; estado: EstadoRegla }
+
+/**
+ * Las reglas del PIN nuevo, en el orden del servidor, para tenerlas a la vista mientras se crea: así se sabe qué falta
+ * antes de enviarlo. "6 números" se marca desde el primer dígito; las demás, recién con los 6, porque antes no hay
+ * PIN que revisar. Recibe el teléfono para recalcular la última también cuando cambia el número.
+ */
+export function revisarPinNuevo(pin: string, telefono: string): ReglaRevisada[] {
+  const completo = pinCompleto(pin)
+  const segun = (cumple: boolean): EstadoRegla => (cumple ? 'cumple' : 'no-cumple')
+  const conLosSeis = (cumple: () => boolean): EstadoRegla => (completo ? segun(cumple()) : 'pendiente')
+  return [
+    { texto: '6 números', estado: pin === '' ? 'pendiente' : segun(completo) },
+    { texto: 'Ni todos iguales ni seguidos', estado: conLosSeis(() => !esPinDebil(pin)) },
+    { texto: 'Que no sea de los más usados', estado: conLosSeis(() => !esDeLosMasUsados(pin)) },
+    { texto: 'Que no sean los números de tu teléfono', estado: conLosSeis(() => !saleDelTelefono(pin, telefono)) },
+  ]
+}
 
 /** Las letras y números del código de activación, sin contar el guion. */
 const LARGO_CODIGO_ACTIVACION = 8

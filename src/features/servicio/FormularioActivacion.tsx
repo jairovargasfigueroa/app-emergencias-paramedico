@@ -2,7 +2,7 @@ import Feather from '@expo/vector-icons/Feather'
 import { useForm } from '@tanstack/react-form'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Button, H1, Input, Label, Paragraph, Spinner, XStack, YStack, useTheme } from 'tamagui'
+import { Button, H1, Input, Label, Paragraph, Spinner, Text, XStack, YStack, useTheme } from 'tamagui'
 import { z } from 'zod'
 
 import { mensajeDeError } from '@/shared/api/cliente'
@@ -17,8 +17,10 @@ import {
   intentosRestantes,
   MENSAJE_PIN_DEL_TELEFONO,
   MENSAJE_TELEFONO_NO_ENCONTRADO,
+  revisarPinNuevo,
   saleDelTelefono,
   textoIntentos,
+  type ReglaRevisada,
 } from './acceso'
 import { activarTelefonoMutation } from './queries'
 
@@ -236,9 +238,19 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
                       </Button.Text>
                     </Button>
                   </XStack>
-                  <Paragraph color="$textoSecundario" fontSize={13} lineHeight={18}>
-                    6 números que no sean todos iguales ni seguidos.
-                  </Paragraph>
+                  {/*
+                    Arriba de las cajitas y no abajo: mientras se escribe, lo de abajo queda tapado por el teclado.
+                    Escucha también el teléfono, que cambia la última regla.
+                  */}
+                  <form.Subscribe selector={(estado) => [estado.values.pin, estado.values.telefono] as const}>
+                    {([pin, telefono]) => (
+                      <YStack gap={4}>
+                        {revisarPinNuevo(pin, telefono).map((regla) => (
+                          <LineaDeRegla key={regla.texto} texto={regla.texto} estado={regla.estado} />
+                        ))}
+                      </YStack>
+                    )}
+                  </form.Subscribe>
                 </YStack>
                 <CajitasDeCodigo
                   id="pin"
@@ -319,5 +331,28 @@ export function FormularioActivacion({ telefonoInicial, aviso, onIngresarConPin 
         )}
       </form.Subscribe>
     </>
+  )
+}
+
+/** Gris mientras no se puede revisar, verde si se cumple y roja si no: se lee de un vistazo, sin leer el texto. */
+const MARCAS = {
+  pendiente: { icono: 'circle', color: 'textoSecundario', lectura: 'sin revisar todavía' },
+  cumple: { icono: 'check', color: 'disponibleTexto', lectura: 'se cumple' },
+  'no-cumple': { icono: 'x', color: 'primarioPresionado', lectura: 'no se cumple' },
+} as const
+
+/** Una regla con su marca. Para el lector de pantalla, la marca va dicha en palabras junto al texto. */
+function LineaDeRegla({ texto, estado }: ReglaRevisada) {
+  const tema = useTheme()
+  const marca = MARCAS[estado]
+  return (
+    <XStack items="center" gap={8}>
+      <YStack aria-hidden>
+        <Feather name={marca.icono} size={16} color={tema[marca.color]?.val} />
+      </YStack>
+      <Text color={`$${marca.color}`} fontSize={14} lineHeight={20} aria-label={`${texto}: ${marca.lectura}`}>
+        {texto}
+      </Text>
+    </XStack>
   )
 }
