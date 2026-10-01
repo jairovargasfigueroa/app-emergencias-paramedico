@@ -4,6 +4,7 @@ import {
   abrirIncidenteDeNotificacion,
   actualizarTokenDelDispositivo,
   cargarNotificaciones,
+  quitarAvisosDeLaBandeja,
   recibirNotificacion,
   registrarDispositivo,
 } from './notificaciones'
@@ -11,7 +12,8 @@ import {
 /**
  * Registra el dispositivo, sigue los cambios de token y abre lo que trae un push cuando se lo toca. Con la app abierta,
  * un push de traslado, de despacho o un aviso de la central además refresca la unidad: el cambio aparece sin tener que
- * tocarlo. Donde no hay push (Expo Go para Android) no hace nada.
+ * tocarlo. Al cerrarse la sesión, a mano o porque venció, quita de la bandeja los avisos de la cuenta. Donde no hay push
+ * (Expo Go para Android) no hace nada.
  */
 export function useNotificaciones(paramedicoId: number) {
   useEffect(() => {
@@ -47,6 +49,8 @@ export function useNotificaciones(paramedicoId: number) {
     return () => {
       activo = false
       suscripciones.forEach((suscripcion) => suscripcion.remove())
+      // Esto se desmonta cuando se cierra la sesión: ya no hay un paramédico identificado en este teléfono.
+      void quitarAvisosDeLaBandeja()
     }
   }, [paramedicoId])
 }

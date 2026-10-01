@@ -93,6 +93,19 @@ export async function actualizarTokenDelDispositivo(paramedicoId: number, token:
   }
 }
 
+/**
+ * Quita de la bandeja los avisos de la cuenta: los de incidentes y traslados pueden traer datos de pacientes, y no
+ * tienen que quedar a la vista de quien use el teléfono después de cerrar la sesión.
+ */
+export async function quitarAvisosDeLaBandeja() {
+  const Notifications = await cargarNotificaciones()
+  try {
+    await Notifications?.dismissAllNotificationsAsync()
+  } catch {
+    // Si el sistema no los deja quitar, quedan en la bandeja: la sesión se cierra igual.
+  }
+}
+
 /** Lo que el backend pone en `tipo` cuando le saca el traslado a la unidad. */
 function motivoDelRetiro(tipo: unknown): MotivoDelRetiro | null {
   switch (tipo) {

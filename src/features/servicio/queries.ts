@@ -206,12 +206,11 @@ async function dejarDeRecibirAvisos() {
 
 /**
  * Salir, o el backend ya no reconoce al paramédico guardado: la app vuelve a pedir la identificación. Primero, con la
- * sesión todavía abierta, este teléfono deja de recibir sus avisos; después se borra la sesión. La clave del teléfono y
- * el último número quedan: son del teléfono, no de la sesión.
+ * sesión todavía abierta, este teléfono deja de recibir sus avisos; después se cierra la sesión, que borra lo que la
+ * app trajo de la cuenta. La clave del teléfono y el último número quedan: son del teléfono, no de la sesión.
  */
 export async function olvidarParamedico(queryClient: QueryClient) {
   await dejarDeRecibirAvisos()
-  queryClient.removeQueries({ queryKey: ['servicio'] })
   await cerrarSesion(queryClient)
 }
 
