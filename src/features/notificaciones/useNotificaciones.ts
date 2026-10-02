@@ -11,8 +11,8 @@ import {
 
 /**
  * Registra el dispositivo, sigue los cambios de token y abre lo que trae un push cuando se lo toca. Con la app abierta,
- * un push de traslado, de despacho o un aviso de la central además refresca la unidad: el cambio aparece sin tener que
- * tocarlo. Al cerrarse la sesión, a mano o porque venció, quita de la bandeja los avisos de la cuenta. Donde no hay push
+ * un push de traslado, de despacho o un aviso de la central además refresca la unidad, y uno de resumen vuelve a pedir el
+ * resumen del incidente: el cambio aparece sin tener que tocarlo. Al cerrarse la sesión, a mano o porque venció, quita de la bandeja los avisos de la cuenta. Donde no hay push
  * (Expo Go para Android) no hace nada.
  */
 export function useNotificaciones(paramedicoId: number) {

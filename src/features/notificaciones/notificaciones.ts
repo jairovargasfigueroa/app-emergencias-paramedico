@@ -9,6 +9,8 @@ import {
   seEstaAvisandoElRetiro,
   type MotivoDelRetiro,
 } from '@/features/atencion/atencionRetirada'
+import { incidenteEnPantalla } from '@/features/resumen/incidenteEnPantalla'
+import { resumenKeys } from '@/features/resumen/queries'
 import { servicioApi } from '@/features/servicio/api'
 import { servicioKeys } from '@/features/servicio/queries'
 import { irAInicio } from '@/shared/navegacion/inicio'
@@ -19,6 +21,21 @@ export const CANAL_INCIDENTES = 'incidentes'
 
 /** Marca del aviso fijo de la atención en curso, para distinguirlo de un incidente nuevo. */
 export const TIPO_ATENCION_EN_CURSO = 'atencion-en-curso'
+
+/**
+ * Lo que el backend pone en `tipo` cuando la IA armó una versión nueva del resumen de un incidente. Llega solo a quien
+ * tiene una atención activa ahí, por el canal por defecto de FCM, como los demás push del paramédico.
+ */
+const TIPO_RESUMEN_IA = 'RESUMEN_IA'
+
+/** El incidente del push de un resumen nuevo, o `null` si el push es de otra cosa. */
+function incidenteDelResumen(datos: Record<string, unknown> | undefined): number | null {
+  if (datos?.tipo !== TIPO_RESUMEN_IA) {
+    return null
+  }
+  const incidenteId = Number(datos.incidenteId)
+  return Number.isInteger(incidenteId) ? incidenteId : null
+}
 
 type ModuloNotificaciones = typeof import('expo-notifications')
 
@@ -36,13 +53,18 @@ export function cargarNotificaciones(): Promise<ModuloNotificaciones | null> {
         .then((Notifications) => {
           Notifications.setNotificationHandler({
             handleNotification: async (notificacion) => {
+              const datos = notificacion.request.content.data
               // El aviso fijo de la atención en curso no suena ni salta: es un recordatorio, no una alerta.
-              const fijo = notificacion.request.content.data?.tipo === TIPO_ATENCION_EN_CURSO
+              const fijo = datos?.tipo === TIPO_ATENCION_EN_CURSO
+              // Un resumen nuevo del incidente que se está mirando se actualiza ahí mismo: no hace falta interrumpir.
+              const aLaVista = incidenteEnPantalla()
+              const resumenALaVista = aLaVista !== null && incidenteDelResumen(datos) === aLaVista
+              const callado = fijo || resumenALaVista
               return {
                 // Con la app abierta, el push de un incidente nuevo también se muestra.
-                shouldShowBanner: !fijo,
+                shouldShowBanner: !callado,
                 shouldShowList: true,
-                shouldPlaySound: !fijo,
+                shouldPlaySound: !callado,
                 shouldSetBadge: false,
               }
             },
@@ -184,9 +206,24 @@ function actualizarPorAvisoDeLaCentral(datos: Record<string, unknown> | undefine
   return true
 }
 
+/**
+ * Un push de resumen dice que la IA armó una versión nueva: se vuelve a pedir, y si la pantalla del incidente está
+ * abierta se ve en el acto. Devuelve el incidente, o `null` si el push no era de un resumen.
+ */
+function actualizarPorResumen(datos: Record<string, unknown> | undefined) {
+  const incidenteId = incidenteDelResumen(datos)
+  if (incidenteId !== null) {
+    void queryClient.invalidateQueries({ queryKey: resumenKeys.incidente(incidenteId) })
+  }
+  return incidenteId
+}
+
 /** Push que llega con la app abierta. El aviso lo muestra el sistema; acá se refresca lo que cambió. */
 export function recibirNotificacion(notificacion: Notification, paramedicoId: number) {
   const datos = notificacion.request.content.data
+  if (actualizarPorResumen(datos) !== null) {
+    return
+  }
   if (!actualizarPorDespacho(datos, paramedicoId) && !actualizarPorAvisoDeLaCentral(datos, paramedicoId)) {
     actualizarPorTraslado(datos, paramedicoId)
   }
@@ -198,7 +235,8 @@ const respuestasAtendidas = new Set<string>()
  * Al tocar el push, abre lo que el aviso trae: el incidente si es una emergencia nueva, para decidir si tomarla, o el
  * inicio si la central mandó a la unidad a una emergencia o si vino de un traslado, porque lo asignado se atiende desde
  * ahí igual que cualquier atención en curso. Si le sacaron el traslado, ahí mismo se ve el aviso de por qué. Un aviso de
- * la central también lleva al inicio: ahí se ve cómo quedó la unidad.
+ * la central también lleva al inicio: ahí se ve cómo quedó la unidad. Un resumen nuevo abre su incidente, salvo que ya
+ * esté a la vista: ahí solo se vuelve a pedir.
  */
 export function abrirIncidenteDeNotificacion(respuesta: NotificationResponse, paramedicoId: number) {
   const identificador = respuesta.notification.request.identifier
@@ -207,6 +245,13 @@ export function abrirIncidenteDeNotificacion(respuesta: NotificationResponse, pa
   }
   respuestasAtendidas.add(identificador)
   const datos = respuesta.notification.request.content.data
+  const incidenteDelPush = actualizarPorResumen(datos)
+  if (incidenteDelPush !== null) {
+    if (incidenteEnPantalla() !== incidenteDelPush) {
+      router.push({ pathname: '/incidente/[id]', params: { id: String(incidenteDelPush) } })
+    }
+    return
+  }
   // El despacho también trae el incidente, pero no hay nada que tomar: la unidad ya va para allá.
   if (actualizarPorDespacho(datos, paramedicoId) || actualizarPorAvisoDeLaCentral(datos, paramedicoId)) {
     irAInicio()
