@@ -99,14 +99,14 @@ function LineaDelVideo({ marcas, onElegir }: { marcas: MarcaDelVideo[]; onElegir
           key={indice}
           disabled={!onElegir}
           accessibilityRole={onElegir ? 'button' : 'text'}
-          onPress={() => onElegir?.(marca.startSecond)}
+          onPress={() => onElegir?.(marca.segundo)}
         >
           <XStack gap={12} py={6}>
             <Text width={48} color={onElegir ? '$primario' : '$textoSecundario'} fontSize={16} fontFamily="$mono">
-              {minutosYSegundos(marca.startSecond)}
+              {minutosYSegundos(marca.segundo)}
             </Text>
             <Text flex={1} color="$texto" fontSize={17} lineHeight={24}>
-              {marca.text}
+              {marca.texto}
             </Text>
           </XStack>
         </Pressable>
