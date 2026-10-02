@@ -64,12 +64,24 @@ export type Modalidad = 'IMAGEN' | 'AUDIO' | 'VIDEO'
 
 export type EstadoEvidencia = 'PENDIENTE_SUBIDA' | 'SUBIDA' | 'ANALIZADA' | 'FALLIDA' | 'DESCARTADA'
 
-/** `EvidenciaResponse` del backend: solo las subidas, analizadas o no. */
+/** Segundo del video y lo que pasa ahí. */
+export type MarcaDelVideo = {
+  startSecond: number
+  text: string
+}
+
+/**
+ * `EvidenciaResponse` del backend: solo las subidas, analizadas o no. La transcripción y la línea de tiempo existen
+ * en el análisis de cada audio o video, pero el backend todavía no las devuelve: quedan opcionales para mostrarlas
+ * apenas lleguen.
+ */
 export type Evidencia = {
   evidenciaId: number
   alertaId: number
   modalidad: Modalidad
   estado: EstadoEvidencia
+  transcripcion?: string | null
+  lineaDeTiempo?: MarcaDelVideo[]
 }
 
 /**
