@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button, Spinner, YStack } from 'tamagui'
 
 import { AvisoSinArchivo } from './AvisoSinArchivo'
+import { AvisoSinAtencion } from './AvisoSinAtencion'
 import { useUrlEvidencia } from './useUrlEvidencia'
 
 /**
@@ -13,8 +14,12 @@ import { useUrlEvidencia } from './useUrlEvidencia'
  * tiene por qué quedar guardado en el teléfono. Al tocarla se abre a pantalla completa.
  */
 export function FotoEvidencia({ evidenciaId }: { evidenciaId: number }) {
-  const { url, cargando, error, alFallarCarga, alCargar, reintentar } = useUrlEvidencia(evidenciaId)
+  const { url, cargando, error, sinAtencion, alFallarCarga, alCargar, reintentar } = useUrlEvidencia(evidenciaId)
   const [ampliada, setAmpliada] = useState(false)
+
+  if (sinAtencion) {
+    return <AvisoSinAtencion />
+  }
 
   if (error) {
     return <AvisoSinArchivo onReintentar={reintentar} />

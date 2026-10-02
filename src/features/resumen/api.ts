@@ -1,4 +1,4 @@
-import { api } from '@/shared/api/cliente'
+import { api, ErrorApi } from '@/shared/api/cliente'
 
 /** Vocabularios cerrados del servicio de análisis. Llegan en inglés: los nombres en español están en `textos.ts`. */
 export type TipoEvento =
@@ -102,4 +102,14 @@ export type ResumenIncidente = {
 
 export const resumenApi = {
   consultar: (incidenteId: number) => api.get<ResumenIncidente>(`/incidentes/${incidenteId}/resumen`),
+}
+
+/**
+ * Código del 403 con que el backend niega el resumen y las URLs de las evidencias a quien no tiene una atención activa
+ * en el incidente. No es una falla: se ve cuando la unidad lo atiende, así que no se reintenta ni se vuelve a pedir.
+ */
+export const SIN_ATENCION_EN_INCIDENTE = 'SIN_ATENCION_EN_INCIDENTE'
+
+export function esSinAtencion(error: unknown): boolean {
+  return error instanceof ErrorApi && error.status === 403 && error.codigo === SIN_ATENCION_EN_INCIDENTE
 }
