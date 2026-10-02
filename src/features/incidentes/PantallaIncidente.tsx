@@ -7,6 +7,7 @@ import MapView from 'react-native-maps'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button, H1, Paragraph, Text, XStack, YStack, useTheme } from 'tamagui'
 
+import { SeccionEvidencias } from '@/features/evidencias/SeccionEvidencias'
 import { usePosicionActual } from '@/features/posicion/posicionActual'
 import { SeccionResumen } from '@/features/resumen/SeccionResumen'
 import { distanciaEnMetros, formatearDistancia } from '@/shared/formato/distancia'
@@ -160,6 +161,8 @@ function DetalleIncidente({ incidente, acciones }: { incidente: IncidenteAbierto
               ))
             )}
           </YStack>
+
+          <SeccionEvidencias incidenteId={incidente.id} />
 
           {/* Aire antes del pie: el botón no queda donde el dedo acaba de tocar la tarjeta para entrar. */}
           <YStack height={24} />

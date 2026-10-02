@@ -23,4 +23,8 @@ export const urlEvidenciaQuery = (evidenciaId: number) =>
       return venceEn ? Math.max(0, new Date(venceEn).getTime() - Date.now() - MARGEN_MS) : 0
     },
     gcTime: 0,
+    // Una URL nueva rearma el reproductor y lo haría sonar solo al volver a la app: se renueva únicamente cuando el
+    // archivo no carga o cuando se vuelve a abrir.
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
