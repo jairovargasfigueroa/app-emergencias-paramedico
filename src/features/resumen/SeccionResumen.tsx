@@ -2,7 +2,7 @@ import Feather from '@expo/vector-icons/Feather'
 import type { ReactNode } from 'react'
 import { Button, Paragraph, Spinner, Text, XStack, YStack, useTheme } from 'tamagui'
 
-import type { Afirmacion, ResumenIa } from './api'
+import { esSinAtencion, type Afirmacion, type ResumenIa } from './api'
 import { GravedadPreliminar } from './GravedadPreliminar'
 import { textoCorroboracion, textoPeligro, textoPersonas, textoTipoEvento } from './textos'
 import { useResumenEnVivo } from './useResumenEnVivo'
@@ -14,6 +14,8 @@ import { useResumenEnVivo } from './useResumenEnVivo'
 export function SeccionResumen({ incidenteId }: { incidenteId: number }) {
   const consulta = useResumenEnVivo(incidenteId)
   const resumen = consulta.data?.resumen
+  // Lo que ya se tenía tampoco se muestra: la API dejó de darlo porque la unidad no atiende el incidente.
+  const sinAtencion = esSinAtencion(consulta.error)
 
   return (
     <YStack gap={14}>
@@ -21,10 +23,14 @@ export function SeccionResumen({ incidenteId }: { incidenteId: number }) {
         <Text color="$texto" fontSize={20} lineHeight={26} fontWeight="600">
           Lo que se sabe
         </Text>
-        <EtiquetaPreliminar />
+        {sinAtencion ? null : <EtiquetaPreliminar />}
       </YStack>
 
-      {consulta.isPending ? (
+      {sinAtencion ? (
+        <Paragraph color="$textoSecundario" fontSize={16} lineHeight={23}>
+          La información de la IA se ve cuando tu unidad atiende este incidente.
+        </Paragraph>
+      ) : consulta.isPending ? (
         <XStack items="center" gap={10} py={8}>
           <Spinner color="$primario" />
           <Text color="$textoSecundario" fontSize={16}>
