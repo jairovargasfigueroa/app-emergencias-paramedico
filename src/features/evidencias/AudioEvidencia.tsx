@@ -1,11 +1,11 @@
-import Feather from '@expo/vector-icons/Feather'
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
 import { useEffect, useState } from 'react'
-import { Button, Spinner, Text, XStack, YStack, useTheme } from 'tamagui'
+import { Text, XStack, YStack } from 'tamagui'
 
 import type { Evidencia } from '@/features/resumen/api'
 
 import { AvisoSinArchivo } from './AvisoSinArchivo'
+import { BotonReproducir } from './BotonReproducir'
 import { minutosYSegundos } from './formato'
 import { Transcripcion } from './Transcripcion'
 import { useUrlEvidencia } from './useUrlEvidencia'
@@ -88,33 +88,5 @@ function Reproductor({ url, onCargar, onFallar }: PropsReproductor) {
         {minutosYSegundos(estado.currentTime)} / {minutosYSegundos(estado.duration)}
       </Text>
     </XStack>
-  )
-}
-
-type PropsBoton = {
-  texto: string
-  icono?: 'play' | 'pause'
-  cargando: boolean
-  onPress: () => void
-}
-
-function BotonReproducir({ texto, icono = 'play', cargando, onPress }: PropsBoton) {
-  const tema = useTheme()
-  return (
-    <Button
-      self="flex-start"
-      height={48}
-      px={18}
-      rounded={12}
-      bg="$superficie"
-      borderColor="$bordeFuerte"
-      disabled={cargando}
-      icon={cargando ? <Spinner color="$texto" /> : <Feather name={icono} size={20} color={tema.texto?.val} />}
-      onPress={onPress}
-    >
-      <Button.Text color="$texto" fontSize={16} fontWeight="600">
-        {texto}
-      </Button.Text>
-    </Button>
   )
 }
