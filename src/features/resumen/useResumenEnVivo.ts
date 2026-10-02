@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { baseDatosFirebase } from '@/shared/firebase/baseDatos'
 
 import { esSinAtencion, type ResumenIncidente } from './api'
+import { useMarcarIncidenteEnPantalla } from './incidenteEnPantalla'
 import { resumenIncidenteQuery, resumenKeys } from './queries'
 
 /** Nodo que publica el servidor: un hijo por incidente con resumen, con su versión y nada del contenido. */
@@ -17,6 +18,8 @@ const NODO_RESUMENES = 'resumenes'
 export function useResumenEnVivo(incidenteId: number) {
   const queryClient = useQueryClient()
   const consulta = useQuery(resumenIncidenteQuery(incidenteId))
+  // Para que el push de un resumen nuevo de este incidente solo lo vuelva a pedir, sin navegar.
+  useMarcarIncidenteEnPantalla(incidenteId)
 
   useEffect(() => {
     try {
