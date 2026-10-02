@@ -7,7 +7,9 @@ import MapView from 'react-native-maps'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button, H1, Paragraph, Text, XStack, YStack, useTheme } from 'tamagui'
 
+import { SeccionEvidencias } from '@/features/evidencias/SeccionEvidencias'
 import { usePosicionActual } from '@/features/posicion/posicionActual'
+import { SeccionResumen } from '@/features/resumen/SeccionResumen'
 import { distanciaEnMetros, formatearDistancia } from '@/shared/formato/distancia'
 import { duracionLarga } from '@/shared/formato/tiempo'
 import { DELTA_CALLE, regionAlrededorDe } from '@/shared/mapa/region'
@@ -129,6 +131,10 @@ function DetalleIncidente({ incidente, acciones }: { incidente: IncidenteAbierto
             </Text>
           </YStack>
 
+          {/* El resumen de la IA solo se ve aquí adentro: el mapa y la lista no marcan qué incidentes lo tienen, para
+              no empujar a elegir unos sobre otros. */}
+          <SeccionResumen incidenteId={incidente.id} />
+
           <YStack gap={10}>
             <Text color="$texto" fontSize={14} fontWeight="600">
               Lo que reportaron
@@ -155,6 +161,8 @@ function DetalleIncidente({ incidente, acciones }: { incidente: IncidenteAbierto
               ))
             )}
           </YStack>
+
+          <SeccionEvidencias incidenteId={incidente.id} />
 
           {/* Aire antes del pie: el botón no queda donde el dedo acaba de tocar la tarjeta para entrar. */}
           <YStack height={24} />
