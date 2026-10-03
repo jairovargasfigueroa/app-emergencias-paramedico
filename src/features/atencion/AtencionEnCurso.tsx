@@ -7,11 +7,13 @@ import MapView from 'react-native-maps'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button, Paragraph, Text, XStack, YStack, useTheme, useToastController } from 'tamagui'
 
+import { SeccionEvidencias } from '@/features/evidencias/SeccionEvidencias'
 import { tituloDelLugar } from '@/features/incidentes/direcciones'
 import { useIncidentesAbiertos } from '@/features/incidentes/incidentesAbiertos'
 import { MarcadorIncidente } from '@/features/incidentes/MarcadorIncidente'
 import { direccionIncidenteQuery } from '@/features/incidentes/queries'
 import { leerPosicionActual, usePosicionActual } from '@/features/posicion/posicionActual'
+import { SeccionResumen } from '@/features/resumen/SeccionResumen'
 import { ErrorApi, mensajeDeError } from '@/shared/api/cliente'
 import { distanciaEnMetros, formatearDistancia } from '@/shared/formato/distancia'
 import { CENTRO_POR_DEFECTO, DELTA_BARRIO, DELTA_CIUDAD, regionAlrededorDe } from '@/shared/mapa/region'
@@ -511,6 +513,11 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
             style={{ maxHeight: altoPantalla * FRACCION_DETALLES }}
             contentContainerStyle={{ gap: 14, paddingHorizontal: 4, paddingTop: 4 }}
           >
+            {/* Camino al lugar es cuando más sirve lo que la IA sacó de las fotos y audios: va primero. Un traslado no
+                tiene evidencias. */}
+            {atencion.traslado || atencion.incidenteId === null ? null : (
+              <SeccionResumen incidenteId={atencion.incidenteId} />
+            )}
             {/* PB-03 R2: todas las descripciones, no solo la primera; pueden haber avisado varias personas. Un
                 traslado no tiene reportes: lo que se sabe de él ya está en su panel. */}
             {atencion.traslado ? null : (
@@ -540,6 +547,9 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
                   ))
                 )}
               </YStack>
+            )}
+            {atencion.traslado || atencion.incidenteId === null ? null : (
+              <SeccionEvidencias incidenteId={atencion.incidenteId} />
             )}
             <HitosAtencion atencion={atencion} />
           </ScrollView>
