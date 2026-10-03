@@ -4,7 +4,8 @@ import { useEffect } from 'react'
 
 import { baseDatosFirebase } from '@/shared/firebase/baseDatos'
 
-import type { ResumenIncidente } from './api'
+import { esSinAtencion, type ResumenIncidente } from './api'
+import { useMarcarIncidenteEnPantalla } from './incidenteEnPantalla'
 import { resumenIncidenteQuery, resumenKeys } from './queries'
 
 /** Nodo que publica el servidor: un hijo por incidente con resumen, con su versión y nada del contenido. */
@@ -17,6 +18,8 @@ const NODO_RESUMENES = 'resumenes'
 export function useResumenEnVivo(incidenteId: number) {
   const queryClient = useQueryClient()
   const consulta = useQuery(resumenIncidenteQuery(incidenteId))
+  // Para que el push de un resumen nuevo de este incidente solo lo vuelva a pedir, sin navegar.
+  useMarcarIncidenteEnPantalla(incidenteId)
 
   useEffect(() => {
     try {
@@ -25,11 +28,14 @@ export function useResumenEnVivo(incidenteId: number) {
         (snapshot) => {
           const version: unknown = snapshot.child('version').val()
           const clave = resumenKeys.incidente(incidenteId)
+          const estado = queryClient.getQueryState(clave)
           const conocida = queryClient.getQueryData<ResumenIncidente>(clave)?.version
           // Al suscribirse llega la versión actual: si ya es la que se tiene, o la primera consulta sigue en camino,
           // no hace falta pedirla de nuevo.
-          const enCamino = conocida === undefined && queryClient.getQueryState(clave)?.fetchStatus === 'fetching'
-          if (typeof version === 'number' && version !== conocida && !enCamino) {
+          const enCamino = conocida === undefined && estado?.fetchStatus === 'fetching'
+          // Sin atención en el incidente la API la va a negar igual: una versión nueva no cambia eso.
+          const sinAtencion = esSinAtencion(estado?.error)
+          if (typeof version === 'number' && version !== conocida && !enCamino && !sinAtencion) {
             void queryClient.invalidateQueries({ queryKey: clave })
           }
         },

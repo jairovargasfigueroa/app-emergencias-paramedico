@@ -5,6 +5,7 @@ import { Text, XStack, YStack } from 'tamagui'
 import type { Evidencia } from '@/features/resumen/api'
 
 import { AvisoSinArchivo } from './AvisoSinArchivo'
+import { AvisoSinAtencion } from './AvisoSinAtencion'
 import { BotonReproducir } from './BotonReproducir'
 import { minutosYSegundos } from './formato'
 import { Transcripcion } from './Transcripcion'
@@ -18,7 +19,9 @@ export function AudioEvidencia({ evidencia }: { evidencia: Evidencia }) {
   return (
     <YStack gap={10}>
       <Transcripcion texto={evidencia.transcripcion} />
-      {archivo.error ? (
+      {archivo.sinAtencion ? (
+        <AvisoSinAtencion />
+      ) : archivo.error ? (
         <AvisoSinArchivo onReintentar={archivo.reintentar} />
       ) : archivo.url ? (
         <Reproductor key={archivo.url} url={archivo.url} onCargar={archivo.alCargar} onFallar={archivo.alFallarCarga} />
