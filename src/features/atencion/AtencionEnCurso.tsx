@@ -13,6 +13,7 @@ import { useIncidentesAbiertos } from '@/features/incidentes/incidentesAbiertos'
 import { MarcadorIncidente } from '@/features/incidentes/MarcadorIncidente'
 import { direccionIncidenteQuery } from '@/features/incidentes/queries'
 import { leerPosicionActual, usePosicionActual } from '@/features/posicion/posicionActual'
+import { useMarcarAtencionEnPantalla } from '@/features/resumen/incidenteEnPantalla'
 import { SeccionResumen } from '@/features/resumen/SeccionResumen'
 import { TarjetaLoQueSeSabe } from '@/features/resumen/TarjetaLoQueSeSabe'
 import { ErrorApi, mensajeDeError } from '@/shared/api/cliente'
@@ -331,6 +332,8 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   // Un traslado no tiene resumen: lo que se sabe de él ya está en su panel.
   const incidenteConResumen = atencion.traslado || atencion.incidenteId === null ? null : atencion.incidenteId
   const fraccionDetalles = incidenteConResumen === null ? FRACCION_DETALLES : FRACCION_DETALLES_CON_LO_QUE_SE_SABE
+  // El push de un resumen nuevo de este incidente no suena con la atención a la vista: el resumen ya se ve acá.
+  useMarcarAtencionEnPantalla(incidenteConResumen)
 
   return (
     <YStack flex={1} bg="$fondo">
