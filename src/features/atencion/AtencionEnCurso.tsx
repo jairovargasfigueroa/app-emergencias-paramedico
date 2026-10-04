@@ -16,6 +16,7 @@ import { leerPosicionActual, usePosicionActual } from '@/features/posicion/posic
 import { useMarcarAtencionEnPantalla } from '@/features/resumen/incidenteEnPantalla'
 import { SeccionResumen } from '@/features/resumen/SeccionResumen'
 import { TarjetaLoQueSeSabe } from '@/features/resumen/TarjetaLoQueSeSabe'
+import { useLectura } from '@/features/voz/useLectura'
 import { ErrorApi, mensajeDeError } from '@/shared/api/cliente'
 import { distanciaEnMetros, formatearDistancia } from '@/shared/formato/distancia'
 import { CENTRO_POR_DEFECTO, DELTA_BARRIO, DELTA_CIUDAD, regionAlrededorDe } from '@/shared/mapa/region'
@@ -334,6 +335,12 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   const fraccionDetalles = incidenteConResumen === null ? FRACCION_DETALLES : FRACCION_DETALLES_CON_LO_QUE_SE_SABE
   // El push de un resumen nuevo de este incidente no suena con la atención a la vista: el resumen ya se ve acá.
   useMarcarAtencionEnPantalla(incidenteConResumen)
+  // En camino nadie lee una pantalla: el resumen se lee en voz, como lo pasaría la central por radio.
+  const repetirLectura = useLectura({
+    incidenteId: incidenteConResumen,
+    placa: atencion.placa,
+    enCamino: atencion.estado === 'EN_CAMINO',
+  })
 
   return (
     <YStack flex={1} bg="$fondo">
@@ -402,7 +409,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
         {incidenteConResumen === null ? null : (
           <YStack rounded={14} bg="$fondo" overflow="hidden">
             <ScrollView style={{ maxHeight: altoPantalla * FRACCION_LO_QUE_SE_SABE }} contentContainerStyle={{ padding: 14 }}>
-              <TarjetaLoQueSeSabe incidenteId={incidenteConResumen} />
+              <TarjetaLoQueSeSabe incidenteId={incidenteConResumen} onRepetir={repetirLectura} />
             </ScrollView>
           </YStack>
         )}

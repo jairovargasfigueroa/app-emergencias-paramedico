@@ -12,6 +12,7 @@ import {
 import { incidenteDeLaAtencionEnPantalla, incidenteEnPantalla } from '@/features/resumen/incidenteEnPantalla'
 import { resumenKeys } from '@/features/resumen/queries'
 import { servicioApi } from '@/features/servicio/api'
+import { avisarActualizacionImportante } from '@/features/voz/useLectura'
 import { servicioKeys } from '@/features/servicio/queries'
 import { irAInicio } from '@/shared/navegacion/inicio'
 import { queryClient } from '@/shared/query/queryClient'
@@ -214,13 +215,17 @@ function actualizarPorAvisoDeLaCentral(datos: Record<string, unknown> | undefine
 }
 
 /**
- * Un push de resumen dice que la IA armó una versión nueva: se vuelve a pedir, y si la pantalla del incidente está
- * abierta se ve en el acto. Devuelve el incidente, o `null` si el push no era de un resumen.
+ * Un push de resumen dice que la IA armó una versión nueva con un cambio importante: se vuelve a pedir, y si la
+ * pantalla del incidente está abierta se ve en el acto. Si es la atención en curso la que está a la vista, además se lee
+ * en voz (solo en camino). Devuelve el incidente, o `null` si el push no era de un resumen.
  */
 function actualizarPorResumen(datos: Record<string, unknown> | undefined) {
   const incidenteId = incidenteDelResumen(datos)
   if (incidenteId !== null) {
     void queryClient.invalidateQueries({ queryKey: resumenKeys.incidente(incidenteId) })
+    if (incidenteId === incidenteDeLaAtencionEnPantalla()) {
+      avisarActualizacionImportante(incidenteId)
+    }
   }
   return incidenteId
 }
