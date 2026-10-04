@@ -69,9 +69,15 @@ export function textoPersonas(personas: ResumenIa['people']): string {
   return `${min} a ${max} personas`
 }
 
-/** "Corroborado por 3 alertas": cuántos reportes distintos lo respaldan. */
+/**
+ * "Lo dicen 3 personas": cuántas alertas distintas lo respaldan, dicho como lo entiende quien va en camino. Vacío si
+ * ninguna alerta lo respalda.
+ */
 export function textoCorroboracion(alertas: number): string {
-  return alertas === 1 ? 'Corroborado por 1 alerta' : `Corroborado por ${alertas} alertas`
+  if (alertas <= 0) {
+    return ''
+  }
+  return alertas === 1 ? 'Lo dice 1 persona' : `Lo dicen ${alertas} personas`
 }
 
 /** "Humo · último reporte 10:32": un peligro que nadie dio por terminado, aunque el último resumen ya no lo nombra. */
