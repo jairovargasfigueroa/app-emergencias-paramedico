@@ -536,7 +536,7 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
             {/* Camino al lugar es cuando más sirve lo que la IA sacó de las fotos y audios: va primero. Un traslado no
                 tiene evidencias. */}
             {atencion.traslado || atencion.incidenteId === null ? null : (
-              <SeccionResumen incidenteId={atencion.incidenteId} />
+              <SeccionResumen incidenteId={atencion.incidenteId} completaLaTarjeta />
             )}
             {/* PB-03 R2: todas las descripciones, no solo la primera; pueden haber avisado varias personas. Un
                 traslado no tiene reportes: lo que se sabe de él ya está en su panel. */}
