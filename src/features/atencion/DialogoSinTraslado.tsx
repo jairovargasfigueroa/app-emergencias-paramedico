@@ -112,7 +112,7 @@ export function DialogoSinTraslado({
           <Paragraph color="$textoSecundario" fontSize={15} lineHeight={22}>
             {esTraslado
               ? 'Cuenta qué pasó en el origen. El traslado queda como no realizado.'
-              : 'Cuenta qué pasó en el lugar. Con esto se cierra el incidente.'}
+              : 'Cuenta qué pasó en el lugar. Con esto termina tu atención.'}
           </Paragraph>
         </YStack>
 
