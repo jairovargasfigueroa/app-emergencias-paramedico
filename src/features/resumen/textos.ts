@@ -1,4 +1,6 @@
-import type { NivelGravedad, Peligro, ResumenIa, TipoEvento } from './api'
+import { horaCorta } from '@/shared/formato/tiempo'
+
+import type { Evidencia, Modalidad, NivelGravedad, Peligro, PeligroConEstado, ResumenIa, TipoEvento } from './api'
 
 const TIPOS_EVENTO: Record<TipoEvento, string> = {
   traffic_accident: 'Accidente de tránsito',
@@ -70,4 +72,28 @@ export function textoPersonas(personas: ResumenIa['people']): string {
 /** "Corroborado por 3 alertas": cuántos reportes distintos lo respaldan. */
 export function textoCorroboracion(alertas: number): string {
   return alertas === 1 ? 'Corroborado por 1 alerta' : `Corroborado por ${alertas} alertas`
+}
+
+/** "Humo · último reporte 10:32": un peligro que nadie dio por terminado, aunque el último resumen ya no lo nombra. */
+export function textoPeligroSinConfirmar(peligro: PeligroConEstado): string {
+  const cuando = peligro.lastReportedAt ? `último reporte ${horaCorta(peligro.lastReportedAt)}` : 'sin novedades'
+  return `${textoPeligro(peligro.type)} · ${cuando}`
+}
+
+const ARCHIVOS: Record<Modalidad, [string, string]> = {
+  IMAGEN: ['foto', 'fotos'],
+  AUDIO: ['audio', 'audios'],
+  VIDEO: ['video', 'videos'],
+}
+
+/** "2 fotos · 1 audio": cuántos archivos mandaron, sin decir nada de lo que tienen. Vacío si no hay ninguno. */
+export function textoEvidencias(evidencias: Evidencia[]): string {
+  return (Object.keys(ARCHIVOS) as Modalidad[])
+    .map((modalidad) => {
+      const cantidad = evidencias.filter((evidencia) => evidencia.modalidad === modalidad).length
+      const [singular, plural] = ARCHIVOS[modalidad]
+      return cantidad === 0 ? null : `${cantidad} ${cantidad === 1 ? singular : plural}`
+    })
+    .filter(Boolean)
+    .join(' · ')
 }
