@@ -25,6 +25,7 @@ const PELIGROS: Record<Peligro, string> = {
   weapon_or_violence: 'Armas o violencia',
   crowd: 'Aglomeración',
   height: 'Altura',
+  entrapment: 'Persona atrapada',
   other: 'Otro peligro',
 }
 
