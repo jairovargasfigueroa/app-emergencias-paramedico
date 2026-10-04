@@ -17,12 +17,19 @@ const ICONOS = {
   critical: { icono: 'alert-octagon', color: 'primario' },
 } as const satisfies Record<TipoPuntoClave, unknown>
 
+type Props = {
+  incidenteId: number
+  /** Vuelve a leer el resumen en voz alta. `null` cuando no se lee: fuera de camino o sin resumen. */
+  onRepetir?: (() => void) | null
+}
+
 /**
  * Lo que se sabe del incidente a simple vista, sin abrir los detalles: los puntos clave en letra grande y la gravedad
  * estimada. Es apoyo para prepararse en camino, no un diagnóstico ni un triaje. Lo demás (hallazgos, riesgos, lo
  * dudoso) queda en los detalles. Tiene que ser corta: comparte la hoja con el paso siguiente de la atención.
  */
-export function TarjetaLoQueSeSabe({ incidenteId }: { incidenteId: number }) {
+export function TarjetaLoQueSeSabe({ incidenteId, onRepetir = null }: Props) {
+  const tema = useTheme()
   const consulta = useResumenEnVivo(incidenteId)
   const ahora = useAhora()
 
@@ -93,9 +100,27 @@ export function TarjetaLoQueSeSabe({ incidenteId }: { incidenteId: number }) {
 
       <GravedadPreliminar gravedad={resumen.severity} />
 
-      <Text color="$textoSecundario" fontSize={14} lineHeight={19}>
-        {textoActualidad(datos, ahora)}
-      </Text>
+      <XStack items="center" justify="space-between" gap={10}>
+        <Text flex={1} color="$textoSecundario" fontSize={14} lineHeight={19}>
+          {textoActualidad(datos, ahora)}
+        </Text>
+        {/* Grande, para tocarlo con guantes y en movimiento: lo que se oyó mal se vuelve a escuchar. */}
+        {onRepetir ? (
+          <Button
+            height={48}
+            px={18}
+            rounded={12}
+            bg="$superficie"
+            borderColor="$bordeFuerte"
+            icon={<Feather name="volume-2" size={20} color={tema.texto?.val} />}
+            onPress={onRepetir}
+          >
+            <Button.Text color="$texto" fontSize={16} fontWeight="600">
+              Repetir
+            </Button.Text>
+          </Button>
+        ) : null}
+      </XStack>
     </YStack>
   )
 }
