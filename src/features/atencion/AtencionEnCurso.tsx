@@ -13,7 +13,10 @@ import { useIncidentesAbiertos } from '@/features/incidentes/incidentesAbiertos'
 import { MarcadorIncidente } from '@/features/incidentes/MarcadorIncidente'
 import { direccionIncidenteQuery } from '@/features/incidentes/queries'
 import { leerPosicionActual, usePosicionActual } from '@/features/posicion/posicionActual'
+import { useMarcarAtencionEnPantalla } from '@/features/resumen/incidenteEnPantalla'
 import { SeccionResumen } from '@/features/resumen/SeccionResumen'
+import { TarjetaLoQueSeSabe } from '@/features/resumen/TarjetaLoQueSeSabe'
+import { useLectura } from '@/features/voz/useLectura'
 import { ErrorApi, mensajeDeError } from '@/shared/api/cliente'
 import { distanciaEnMetros, formatearDistancia } from '@/shared/formato/distancia'
 import { CENTRO_POR_DEFECTO, DELTA_BARRIO, DELTA_CIUDAD, regionAlrededorDe } from '@/shared/mapa/region'
@@ -69,6 +72,13 @@ const MENSAJES_CANCELACION: Record<MotivoCancelacionPropio, string> = {
 
 /** Hasta qué parte del alto de la pantalla crecen los detalles abiertos; lo que no entra se desplaza. */
 const FRACCION_DETALLES = 0.4
+
+/**
+ * Lo mismo para lo que se sabe del incidente, que está siempre a la vista. Con esa tarjeta, los detalles abiertos se
+ * achican: entre las dos no tienen que empujar el paso siguiente fuera de la pantalla.
+ */
+const FRACCION_LO_QUE_SE_SABE = 0.3
+const FRACCION_DETALLES_CON_LO_QUE_SE_SABE = 0.28
 
 /**
  * A partir de esta distancia al incidente, o al origen de un traslado, se recuerda cuánto falta antes de marcar la
@@ -320,6 +330,17 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
   // En un traslado se sabe quién viaja desde antes de salir: no hay paciente que anotar.
   const seAnotaPaciente = atencion.traslado === null
   const descripciones = incidente?.descripciones ?? []
+  // Un traslado no tiene resumen: lo que se sabe de él ya está en su panel.
+  const incidenteConResumen = atencion.traslado || atencion.incidenteId === null ? null : atencion.incidenteId
+  const fraccionDetalles = incidenteConResumen === null ? FRACCION_DETALLES : FRACCION_DETALLES_CON_LO_QUE_SE_SABE
+  // El push de un resumen nuevo de este incidente no suena con la atención a la vista: el resumen ya se ve acá.
+  useMarcarAtencionEnPantalla(incidenteConResumen)
+  // En camino nadie lee una pantalla: el resumen se lee en voz, como lo pasaría la central por radio.
+  const repetirLectura = useLectura({
+    incidenteId: incidenteConResumen,
+    placa: atencion.placa,
+    enCamino: atencion.estado === 'EN_CAMINO',
+  })
 
   return (
     <YStack flex={1} bg="$fondo">
@@ -383,6 +404,15 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
             </YStack>
           </XStack>
         ) : null}
+
+        {/* Fuera de los detalles, que arrancan cerrados: en camino es lo que prepara a la tripulación, sin tocar nada. */}
+        {incidenteConResumen === null ? null : (
+          <YStack rounded={14} bg="$fondo" overflow="hidden">
+            <ScrollView style={{ maxHeight: altoPantalla * FRACCION_LO_QUE_SE_SABE }} contentContainerStyle={{ padding: 14 }}>
+              <TarjetaLoQueSeSabe incidenteId={incidenteConResumen} onRepetir={repetirLectura} />
+            </ScrollView>
+          </YStack>
+        )}
 
         {atencion.traslado ? <PanelDeTraslado traslado={atencion.traslado} /> : null}
 
@@ -510,13 +540,13 @@ export function AtencionEnCurso({ paramedicoId, atencion }: Props) {
         {/* Con varios reportes puede no entrar todo: se desplaza adentro y el paso siguiente sigue a la vista. */}
         {detallesAbiertos ? (
           <ScrollView
-            style={{ maxHeight: altoPantalla * FRACCION_DETALLES }}
+            style={{ maxHeight: altoPantalla * fraccionDetalles }}
             contentContainerStyle={{ gap: 14, paddingHorizontal: 4, paddingTop: 4 }}
           >
             {/* Camino al lugar es cuando más sirve lo que la IA sacó de las fotos y audios: va primero. Un traslado no
                 tiene evidencias. */}
             {atencion.traslado || atencion.incidenteId === null ? null : (
-              <SeccionResumen incidenteId={atencion.incidenteId} />
+              <SeccionResumen incidenteId={atencion.incidenteId} completaLaTarjeta />
             )}
             {/* PB-03 R2: todas las descripciones, no solo la primera; pueden haber avisado varias personas. Un
                 traslado no tiene reportes: lo que se sabe de él ya está en su panel. */}

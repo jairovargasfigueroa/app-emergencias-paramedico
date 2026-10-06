@@ -9,9 +9,10 @@ import {
   seEstaAvisandoElRetiro,
   type MotivoDelRetiro,
 } from '@/features/atencion/atencionRetirada'
-import { incidenteEnPantalla } from '@/features/resumen/incidenteEnPantalla'
+import { incidenteDeLaAtencionEnPantalla, incidenteEnPantalla } from '@/features/resumen/incidenteEnPantalla'
 import { resumenKeys } from '@/features/resumen/queries'
 import { servicioApi } from '@/features/servicio/api'
+import { avisarActualizacionImportante } from '@/features/voz/useLectura'
 import { servicioKeys } from '@/features/servicio/queries'
 import { irAInicio } from '@/shared/navegacion/inicio'
 import { queryClient } from '@/shared/query/queryClient'
@@ -27,6 +28,14 @@ export const TIPO_ATENCION_EN_CURSO = 'atencion-en-curso'
  * tiene una atención activa ahí, por el canal por defecto de FCM, como los demás push del paramédico.
  */
 const TIPO_RESUMEN_IA = 'RESUMEN_IA'
+
+/**
+ * Si el resumen de este incidente ya está a la vista: en su detalle, o en la atención en curso, que lo muestra sin
+ * abrir nada.
+ */
+function resumenALaVista(incidenteId: number | null): boolean {
+  return incidenteId !== null && (incidenteId === incidenteEnPantalla() || incidenteId === incidenteDeLaAtencionEnPantalla())
+}
 
 /** El incidente del push de un resumen nuevo, o `null` si el push es de otra cosa. */
 function incidenteDelResumen(datos: Record<string, unknown> | undefined): number | null {
@@ -56,10 +65,9 @@ export function cargarNotificaciones(): Promise<ModuloNotificaciones | null> {
               const datos = notificacion.request.content.data
               // El aviso fijo de la atención en curso no suena ni salta: es un recordatorio, no una alerta.
               const fijo = datos?.tipo === TIPO_ATENCION_EN_CURSO
-              // Un resumen nuevo del incidente que se está mirando se actualiza ahí mismo: no hace falta interrumpir.
-              const aLaVista = incidenteEnPantalla()
-              const resumenALaVista = aLaVista !== null && incidenteDelResumen(datos) === aLaVista
-              const callado = fijo || resumenALaVista
+              // Un resumen nuevo del incidente que se está mirando, o de la atención en curso, se actualiza ahí mismo:
+              // no hace falta interrumpir con sonido ni con el banner.
+              const callado = fijo || resumenALaVista(incidenteDelResumen(datos))
               return {
                 // Con la app abierta, el push de un incidente nuevo también se muestra.
                 shouldShowBanner: !callado,
@@ -207,13 +215,17 @@ function actualizarPorAvisoDeLaCentral(datos: Record<string, unknown> | undefine
 }
 
 /**
- * Un push de resumen dice que la IA armó una versión nueva: se vuelve a pedir, y si la pantalla del incidente está
- * abierta se ve en el acto. Devuelve el incidente, o `null` si el push no era de un resumen.
+ * Un push de resumen dice que la IA armó una versión nueva con un cambio importante: se vuelve a pedir, y si la
+ * pantalla del incidente está abierta se ve en el acto. Si es la atención en curso la que está a la vista, además se lee
+ * en voz (solo en camino). Devuelve el incidente, o `null` si el push no era de un resumen.
  */
 function actualizarPorResumen(datos: Record<string, unknown> | undefined) {
   const incidenteId = incidenteDelResumen(datos)
   if (incidenteId !== null) {
     void queryClient.invalidateQueries({ queryKey: resumenKeys.incidente(incidenteId) })
+    if (incidenteId === incidenteDeLaAtencionEnPantalla()) {
+      avisarActualizacionImportante(incidenteId)
+    }
   }
   return incidenteId
 }
@@ -247,7 +259,7 @@ export function abrirIncidenteDeNotificacion(respuesta: NotificationResponse, pa
   const datos = respuesta.notification.request.content.data
   const incidenteDelPush = actualizarPorResumen(datos)
   if (incidenteDelPush !== null) {
-    if (incidenteEnPantalla() !== incidenteDelPush) {
+    if (!resumenALaVista(incidenteDelPush)) {
       router.push({ pathname: '/incidente/[id]', params: { id: String(incidenteDelPush) } })
     }
     return

@@ -1,30 +1,47 @@
-import Feather from '@expo/vector-icons/Feather'
 import type { ReactNode } from 'react'
-import { Button, Paragraph, Spinner, Text, XStack, YStack, useTheme } from 'tamagui'
+import { Button, Paragraph, Spinner, Text, XStack, YStack } from 'tamagui'
 
-import { esSinAtencion, type Afirmacion, type ResumenIa } from './api'
+import { esSinAtencion, estadosDePeligro, type Afirmacion, type ResumenIa } from './api'
 import { GravedadPreliminar } from './GravedadPreliminar'
-import { textoCorroboracion, textoPeligro, textoPersonas, textoTipoEvento } from './textos'
+import {
+  textoCorroboracion,
+  textoPeligro,
+  textoPeligroSinConfirmar,
+  textoPersonas,
+  textoTipoEvento,
+} from './textos'
 import { useResumenEnVivo } from './useResumenEnVivo'
+
+type Props = {
+  incidenteId: number
+  /**
+   * En la atención en curso, la tarjeta de lo que se sabe ya muestra los puntos clave y la gravedad: aquí va solo lo
+   * que la completa, para no leer lo mismo dos veces.
+   */
+  completaLaTarjeta?: boolean
+}
 
 /**
  * Lo que la IA juntó de las alertas y las evidencias. Se lee con la ambulancia en marcha: letra grande, bloques cortos
- * y lo dudoso (contradicciones y límites) siempre a la vista. Es apoyo: no es un diagnóstico ni un triaje.
+ * y solo lo que aporta al paramédico. Lo dudoso (contradicciones y límites) aparece cuando lo hay. Es apoyo: no es un
+ * diagnóstico ni un triaje.
  */
-export function SeccionResumen({ incidenteId }: { incidenteId: number }) {
+export function SeccionResumen({ incidenteId, completaLaTarjeta = false }: Props) {
   const consulta = useResumenEnVivo(incidenteId)
   const resumen = consulta.data?.resumen
   // Lo que ya se tenía tampoco se muestra: la API dejó de darlo porque la unidad no atiende el incidente.
   const sinAtencion = esSinAtencion(consulta.error)
 
+  // La tarjeta ya dice si está cargando, si falló o si todavía no hay resumen: aquí solo se agrega lo que la completa.
+  if (completaLaTarjeta && !resumen) {
+    return null
+  }
+
   return (
     <YStack gap={14}>
-      <YStack gap={6}>
-        <Text color="$texto" fontSize={20} lineHeight={26} fontWeight="600">
-          Lo que se sabe
-        </Text>
-        {sinAtencion ? null : <EtiquetaPreliminar />}
-      </YStack>
+      <Text color="$texto" fontSize={20} lineHeight={26} fontWeight="600">
+        {completaLaTarjeta ? 'Más de lo que se sabe' : 'Lo que se sabe'}
+      </Text>
 
       {sinAtencion ? (
         <Paragraph color="$textoSecundario" fontSize={16} lineHeight={23}>
@@ -56,7 +73,7 @@ export function SeccionResumen({ incidenteId }: { incidenteId: number }) {
           </Button>
         </YStack>
       ) : resumen ? (
-        <ContenidoResumen resumen={resumen} />
+        <ContenidoResumen resumen={resumen} completaLaTarjeta={completaLaTarjeta} />
       ) : (
         <Paragraph color="$textoSecundario" fontSize={16} lineHeight={23}>
           Todavía no hay un resumen. Aparece aquí solo cuando esté listo.
@@ -66,27 +83,20 @@ export function SeccionResumen({ incidenteId }: { incidenteId: number }) {
   )
 }
 
-/** Avisa de dónde sale todo lo de abajo, para que no se lea como un dato confirmado. */
-function EtiquetaPreliminar() {
-  const tema = useTheme()
-  return (
-    <XStack self="flex-start" items="center" gap={6} height={28} px={10} rounded={999} bg="$fueraServicioTinte">
-      <Feather name="alert-circle" size={14} color={tema.fueraServicioTexto?.val} />
-      <Text color="$fueraServicioTexto" fontSize={14} fontWeight="500">
-        Preliminar · generado por IA
-      </Text>
-    </XStack>
-  )
-}
+function ContenidoResumen({ resumen, completaLaTarjeta }: { resumen: ResumenIa; completaLaTarjeta: boolean }) {
+  const peligros = estadosDePeligro(resumen)
 
-function ContenidoResumen({ resumen }: { resumen: ResumenIa }) {
   return (
     <YStack gap={18}>
-      <Paragraph color="$texto" fontSize={19} lineHeight={27} fontWeight="500">
-        {resumen.summary}
-      </Paragraph>
+      {completaLaTarjeta ? null : (
+        <>
+          <Paragraph color="$texto" fontSize={19} lineHeight={27} fontWeight="500">
+            {resumen.summary}
+          </Paragraph>
 
-      <GravedadPreliminar gravedad={resumen.severity} />
+          <GravedadPreliminar gravedad={resumen.severity} />
+        </>
+      )}
 
       <YStack gap={4} px={14} py={12} rounded={12} bg="$fondo">
         <Text color="$texto" fontSize={17} lineHeight={23} fontWeight="600">
@@ -97,13 +107,13 @@ function ContenidoResumen({ resumen }: { resumen: ResumenIa }) {
         </Text>
       </YStack>
 
-      {resumen.hazards.length > 0 ? (
+      {peligros.length > 0 ? (
         <Bloque titulo="Peligros en el lugar">
           <XStack flexWrap="wrap" gap={8}>
-            {resumen.hazards.map((peligro) => (
-              <XStack key={peligro} items="center" height={34} px={12} rounded={999} bg="$enAtencionTinte">
+            {peligros.map((peligro) => (
+              <XStack key={peligro.type} items="center" height={34} px={12} rounded={999} bg="$enAtencionTinte">
                 <Text color="$enAtencionTexto" fontSize={16} fontWeight="600">
-                  {textoPeligro(peligro)}
+                  {peligro.status === 'unconfirmed' ? textoPeligroSinConfirmar(peligro) : textoPeligro(peligro.type)}
                 </Text>
               </XStack>
             ))}
@@ -127,20 +137,18 @@ function ContenidoResumen({ resumen }: { resumen: ResumenIa }) {
         </Bloque>
       ) : null}
 
-      {/* Lo dudoso no se esconde: con o sin contenido, estos dos bloques se ven siempre. */}
-      <Bloque titulo="Contradicciones">
-        {resumen.conflicts.length > 0 ? (
-          resumen.conflicts.map((contradiccion, indice) => (
+      {/* Lo dudoso aparece solo cuando lo hay: un bloque vacío es ruido para quien va en camino. */}
+      {resumen.conflicts.length > 0 ? (
+        <Bloque titulo="Contradicciones">
+          {resumen.conflicts.map((contradiccion, indice) => (
             <ItemAfirmacion key={indice} afirmacion={contradiccion} destacado />
-          ))
-        ) : (
-          <TextoVacio>Los reportes no se contradicen.</TextoVacio>
-        )}
-      </Bloque>
+          ))}
+        </Bloque>
+      ) : null}
 
-      <Bloque titulo="Lo que no se puede saber">
-        {resumen.limitations.length > 0 ? (
-          resumen.limitations.map((limite, indice) => (
+      {resumen.limitations.length > 0 ? (
+        <Bloque titulo="Lo que no se puede saber">
+          {resumen.limitations.map((limite, indice) => (
             <Paragraph
               key={indice}
               color="$texto"
@@ -152,11 +160,14 @@ function ContenidoResumen({ resumen }: { resumen: ResumenIa }) {
             >
               {limite}
             </Paragraph>
-          ))
-        ) : (
-          <TextoVacio>La IA no señaló límites.</TextoVacio>
-        )}
-      </Bloque>
+          ))}
+        </Bloque>
+      ) : null}
+
+      {/* Una nota al pie y no una etiqueta arriba: que no se lea como un dato confirmado, sin quitarle lugar a los datos. */}
+      <Text color="$textoSecundario" fontSize={13} lineHeight={18}>
+        Preliminar, armado automáticamente con lo que reportaron.
+      </Text>
     </YStack>
   )
 }
@@ -172,31 +183,20 @@ function Bloque({ titulo, children }: { titulo: string; children: ReactNode }) {
   )
 }
 
-function TextoVacio({ children }: { children: string }) {
-  return (
-    <Paragraph color="$textoSecundario" fontSize={16} lineHeight={23}>
-      {children}
-    </Paragraph>
-  )
-}
-
-/** Una afirmación corta con cuántas alertas la respaldan y, si la IA la dedujo, que es deducida. */
+/** Una afirmación corta y cuántas personas la reportaron. */
 function ItemAfirmacion({ afirmacion, destacado = false }: { afirmacion: Afirmacion; destacado?: boolean }) {
-  const detalle = [
-    textoCorroboracion(afirmacion.corroboratingAlerts),
-    afirmacion.basis === 'inferred' ? 'Deducido, no visto' : null,
-  ]
-    .filter(Boolean)
-    .join(' · ')
+  const detalle = textoCorroboracion(afirmacion.corroboratingAlerts)
 
   return (
     <YStack gap={3} pl={12} borderLeftWidth={3} borderColor={destacado ? '$enAtencion' : '$bordeFuerte'}>
       <Paragraph color="$texto" fontSize={17} lineHeight={24}>
         {afirmacion.text}
       </Paragraph>
-      <Text color="$textoSecundario" fontSize={14} lineHeight={19}>
-        {detalle}
-      </Text>
+      {detalle ? (
+        <Text color="$textoSecundario" fontSize={14} lineHeight={19}>
+          {detalle}
+        </Text>
+      ) : null}
     </YStack>
   )
 }
